@@ -55,6 +55,12 @@ interface WebOptions {
  * This app's command: its flags, its description, and its help text.
  * @returns a fresh program, so one process can parse more than once (tests).
  */
+function parseAuthMode(program: Command, value: string): WebAuthMode {
+  if (value === 'off' || value === 'required') return value
+  program.error(`error: --auth must be "off" or "required", got ${JSON.stringify(value)}`)
+  throw new Error('unreachable')
+}
+
 function webCommand(): Command {
   return new Command()
     .name('dsh --profile web')
@@ -85,9 +91,7 @@ export function apply(ctx: Context): void {
   const program = webCommand()
   program.action(() => {
     const options = program.opts<WebOptions>()
-    if (options.auth !== 'off' && options.auth !== 'required') {
-      program.error(`error: --auth must be "off" or "required", got ${JSON.stringify(options.auth)}`)
-    }
+    const auth = parseAuthMode(program, options.auth)
     if (options.port !== undefined && !/^\d+$/.test(options.port)) {
       program.error(`error: --port must be a number, got ${JSON.stringify(options.port)}`)
     }
@@ -107,7 +111,7 @@ export function apply(ctx: Context): void {
       }
     }
     if (options.host === '0.0.0.0') {
-      if (options.auth !== 'required') {
+      if (auth !== 'required') {
         program.error('error: --host 0.0.0.0 requires --auth required')
       }
       if (options.tlsCert === undefined && options.publicUrl === undefined) {
@@ -115,7 +119,7 @@ export function apply(ctx: Context): void {
       }
     }
     ctx.provide(WEB_STARTUP_SERVICE, {
-      auth: options.auth,
+      auth,
       ...options.host !== undefined && { host: options.host },
       ...options.port !== undefined && { port: Number(options.port) },
       ...options.publicUrl !== undefined && { publicUrl: options.publicUrl },
