@@ -12,7 +12,7 @@ The HTTP carrier also hides the bind address inside `startWebServer()`, so alter
 
 ## Decision
 
-`dsh web` binds `127.0.0.1` by default. The CLI accepts `--host 0.0.0.0` as the explicit all-interface mode and rejects other values so its network modes remain a small, deliberate contract. All-interface mode keeps printing the loopback URL and, when available, the first external IPv4 URL.
+`dsh web` binds `127.0.0.1` by default. The CLI accepts `--host 0.0.0.0` as the explicit all-interface mode and rejects other values so its network modes remain a small, deliberate contract. All-interface mode requires authenticated HTTPS as recorded in [remote Web deployment](2026-08-16-web-remote-deployment-authentication.md), keeps printing the loopback URL, and prints the first external IPv4 URL when no reverse-proxy public URL is configured.
 
 `WebServerOptions.host` is required. The HTTP carrier passes that value to `node:http` without supplying a fallback, leaving each shell responsible for its bind policy. Programmatic carrier consumers may select another hostname or address directly.
 

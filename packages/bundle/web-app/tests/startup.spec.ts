@@ -55,8 +55,12 @@ export const apply = ctx => globalThis.__webStartupApply(ctx)
     `  name: ${pathToFileURL(join(dir, 'reader.mjs')).href}`,
     `  inject: [${WEB_STARTUP_SERVICE}]`,
     '  config:',
+    '    auth: !!js ctx.webStartup.auth',
     "    host: !!js ctx.webStartup.host ?? '127.0.0.1'",
     '    port: !!js ctx.webStartup.port ?? 3080',
+    '    publicUrl: !!js ctx.webStartup.publicUrl',
+    '    tlsCert: !!js ctx.webStartup.tlsCert',
+    '    tlsKey: !!js ctx.webStartup.tlsKey',
     '    trustedHosts: !!js ctx.webStartup.trustedHosts',
     '- id: provider',
     `  name: ${pathToFileURL(join(dir, 'provider.mjs')).href}`,
@@ -92,10 +96,18 @@ describe('web command-line provider', () => {
       '--port', '8080',
       '--trusted-host', 'lab.internal', 'lab-2.internal',
       '--trusted-host', '10.0.0.9',
+      '--auth', 'required',
+      '--public-url', 'https://dsh.example.test',
+      '--tls-cert', 'cert.pem',
+      '--tls-key', 'key.pem',
     ])
     expect(values).toEqual({
+      auth: 'required',
       host: '127.0.0.1',
       port: 8080,
+      publicUrl: 'https://dsh.example.test',
+      tlsCert: 'cert.pem',
+      tlsKey: 'key.pem',
       trustedHosts: ['lab.internal', 'lab-2.internal', '10.0.0.9'],
     })
     expect(observed.readerConfig).toEqual(values)
@@ -104,8 +116,9 @@ describe('web command-line provider', () => {
 
   it('leaves deployment values to each consumer when flags omit them', async () => {
     const { values, observed } = await bootProvider([])
-    expect(values).toEqual({ trustedHosts: [] })
+    expect(values).toEqual({ auth: 'off', trustedHosts: [] })
     expect(observed.readerConfig).toEqual({
+      auth: 'off',
       host: '127.0.0.1',
       port: 3080,
       trustedHosts: [],
@@ -129,11 +142,29 @@ describe('web command-line provider', () => {
     expect(observed.exits).toEqual([1])
   })
 
-  it('rejects the intentionally unsupported all-interfaces host before the consumer activates', async () => {
-    const { values, observed } = await bootProvider(['--host', '0.0.0.0'])
-    expect(observed.out).toContain('--host 0.0.0.0 is intentionally not supported yet for safety: it would expose remote code execution to the network; use 127.0.0.1 instead')
-    expect(values).toBeUndefined()
-    expect(observed.readerConfig).toBeUndefined()
-    expect(observed.exits).toEqual([1])
+  it('requires authentication and HTTPS before accepting an all-interfaces host', async () => {
+    const rejected = await bootProvider(['--host', '0.0.0.0'])
+    expect(rejected.observed.out).toContain('--host 0.0.0.0 requires --auth required')
+    expect(rejected.values).toBeUndefined()
+    expect(rejected.observed.readerConfig).toBeUndefined()
+    expect(rejected.observed.exits).toEqual([1])
+
+    const accepted = await bootProvider([
+      '--host', '0.0.0.0', '--auth', 'required', '--public-url', 'https://dsh.example.test',
+    ])
+    expect(accepted.values).toEqual({
+      auth: 'required', host: '0.0.0.0', publicUrl: 'https://dsh.example.test', trustedHosts: [],
+    })
+    expect(accepted.observed.exits).toEqual([])
+  })
+
+  it('rejects incomplete TLS and malformed public URL options before consumers activate', async () => {
+    const tls = await bootProvider(['--tls-cert', 'cert.pem'])
+    expect(tls.observed.out).toContain('--tls-cert and --tls-key must be provided together')
+    expect(tls.values).toBeUndefined()
+
+    const publicUrl = await bootProvider(['--public-url', 'http://dsh.example.test'])
+    expect(publicUrl.observed.out).toContain('--public-url must be a valid HTTPS URL')
+    expect(publicUrl.values).toBeUndefined()
   })
 })

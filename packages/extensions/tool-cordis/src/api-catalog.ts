@@ -2055,6 +2055,23 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'webAuthToken',
+    summary: 'Process-local Web authentication token state.',
+    description: 'Process-local Web authentication token state.',
+    methods: [
+      {
+        signature: 'mode: WebAuthMode',
+        description: 'Authentication mode selected by the invocation.',
+        parameters: [],
+      },
+      {
+        signature: 'value?: string',
+        description: 'Resolved token while authentication is required.',
+        parameters: [],
+      },
+    ],
+  },
+  {
     key: 'webServer',
     summary: 'The browser HTTP carrier service.',
     description: 'The browser HTTP carrier service. Activation listens immediately. Route registration order does not affect requests because configured named routes must be distinct, and the fallback handler answers anything not yet claimed during startup with 404 until its owner registers. A listen failure rejects initialization, and the boot process reports the failed fiber.',
@@ -2064,6 +2081,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Register a named route. Duplicate (kind, path) throws — route patterns are a composition-level contract, so a collision is a misconfiguration.',
         parameters: [{ name: 'route', description: 'kind, path, and the owning handler.' }],
         returns: 'the disposer removing the route.',
+      },
+      {
+        signature: 'registerGuard(guard: WebRequestGuard): () => void',
+        description: 'Register a request guard. Guards run in registration order before route or fallback dispatch; a rejecting guard owns its response and stops dispatch.',
+        parameters: [{ name: 'guard', description: 'returns whether the request may reach a route.' }],
+        returns: 'the disposer removing the guard.',
+      },
+      {
+        signature: 'registerUpgradeGuard(guard: WebUpgradeGuard): () => void',
+        description: 'Register an upgrade guard. Guards run in registration order before upgrade route dispatch; a rejecting guard owns and closes its socket.',
+        parameters: [{ name: 'guard', description: 'returns whether the upgrade may reach its route.' }],
+        returns: 'the disposer removing the guard.',
       },
       {
         signature: 'registerUpgrade(route: WebUpgradeRoute): () => void',
@@ -4558,6 +4587,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WebFetchResultView {\n    card: \'web\';\n    kind: \'fetch\';\n    title?: string;\n    url: string;\n    statusCode: number;\n    truncated: boolean;\n}',
   },
   {
+    name: 'WebRequestGuard',
+    declaration: 'export type WebRequestGuard = (req: IncomingMessage, res: ServerResponse, pathname: string) => boolean | Promise<boolean>;',
+  },
+  {
     name: 'WebResultView',
     declaration: 'export type WebResultView = WebSearchResultView | WebFetchResultView;',
   },
@@ -4592,6 +4625,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebSource',
     declaration: 'export interface WebSource {\n    url: string;\n    title?: string;\n    snippet?: string;\n    publishedAt?: string;\n}',
+  },
+  {
+    name: 'WebUpgradeGuard',
+    declaration: 'export type WebUpgradeGuard = (req: IncomingMessage, socket: Duplex, pathname: string) => boolean | Promise<boolean>;',
   },
   {
     name: 'WebUpgradeRoute',

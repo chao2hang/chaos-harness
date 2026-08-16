@@ -71,6 +71,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   fs: 'filesystem.md',
   goals: 'goal.md',
   webServer: 'web-server.md',
+  webAuthToken: 'web-server.md',
   invariants: 'invariants.md',
   llm: 'llm-streaming.md',
   lsp: 'lsp.md',
@@ -486,6 +487,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   TypertPackageRecord: 'invariants.md',
   TypertSchemaFilter: 'invariants.md',
   TypertSchemaRecord: 'invariants.md',
+  WebRequestGuard: 'web-server.md',
+  WebUpgradeGuard: 'web-server.md',
 }
 
 /** TypeScript lib and pinned framework types with no repository-owned data page. */

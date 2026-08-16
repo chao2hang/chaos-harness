@@ -45,6 +45,8 @@ export interface Config {
    * orientation text would be false.
    */
   surfaceContext: boolean
+  /** Explicit public HTTPS URL when a reverse proxy terminates TLS. */
+  publicUrl?: string
   /** Explicit `--trusted-host` authorities from this invocation. */
   trustedHosts: string[]
 }
@@ -52,6 +54,7 @@ export interface Config {
 export const Config: z<Config> = z.object({
   printUrl: z.boolean().default(true),
   surfaceContext: z.boolean().default(true),
+  publicUrl: z.string(),
   trustedHosts: z.array(String).default([]),
 })
 
@@ -80,15 +83,17 @@ const ALL_INTERFACES_HOST = '0.0.0.0'
  * an OS-assigned port is unknowable before bind.
  * @param bindHost - the active webserver bind host.
  * @param extra - explicit `--trusted-host` values, in argument order.
+ * @param publicUrl - reverse-proxy public URL, whose authority is trusted.
  * @returns the LAN display addresses and invocation-derived fence authorities.
  */
-export function resolveLanTrust(bindHost: string, extra: readonly string[]): WebRuntimeValues {
+export function resolveLanTrust(bindHost: string, extra: readonly string[], publicUrl?: string): WebRuntimeValues {
   const lanAddresses = bindHost === ALL_INTERFACES_HOST
     ? Object.values(networkInterfaces()).flat()
       .filter((iface): iface is NonNullable<typeof iface> => iface !== undefined && iface.family === 'IPv4' && !iface.internal)
       .map(iface => iface.address)
     : []
-  return { lanAddresses, trustedHosts: [...lanAddresses, ...extra] }
+  const publicAuthority = publicUrl === undefined ? [] : [new URL(publicUrl).host]
+  return { lanAddresses, trustedHosts: [...lanAddresses, ...publicAuthority, ...extra] }
 }
 
 /** Model-visible orientation and acceptance boundary for sessions created through `dsh web`. */
@@ -105,11 +110,12 @@ function webSurfacePrompt(webUrl: string): string {
     + 'Do not start a replacement server unless the user asks; if one is needed, use a managed background job and verify its exact URL.'
 }
 
-/** Resolve the canonical loopback URL from the active Web server. */
-function localWebUrl(ctx: Context): string {
-  const port = ctx.get('webServer')?.port
-  if (port === undefined) throw new Error('web-app: webServer service missing while resolving Web runtime')
-  return `http://${LOOPBACK_HOST}:${String(port)}`
+/** Resolve the canonical URL from the active Web server or reverse-proxy configuration. */
+function localWebUrl(ctx: Context, publicUrl: string | undefined): string {
+  if (publicUrl !== undefined) return publicUrl
+  const server = ctx.get('webServer')
+  if (server === undefined) throw new Error('web-app: webServer service missing while resolving Web runtime')
+  return `${server.protocol}://${LOOPBACK_HOST}:${String(server.port)}`
 }
 
 /** Dist location is workspace knowledge of this bundle: resolved through the frontend package exports, not configured. */
@@ -133,7 +139,7 @@ export const internals: { resolveDistIndex: () => string } = { resolveDistIndex 
  * @param config - validated {@link Config}.
  */
 export function apply(ctx: Context, config: Config): void {
-  const runtime = resolveLanTrust(ctx.webServer.host, config.trustedHosts)
+  const runtime = resolveLanTrust(ctx.webServer.host, config.trustedHosts, config.publicUrl)
   // Release dependent rows only after bind-dependent trust has been sampled once.
   ctx.provide(WEB_RUNTIME_SERVICE, runtime)
   ctx.plugin(FrontendStatic, { distIndex: internals.resolveDistIndex() })
@@ -143,7 +149,7 @@ export function apply(ctx: Context, config: Config): void {
       promptCtx.systemPrompt.section({
         name: 'app:web-surface',
         order: -98,
-        text: () => webSurfacePrompt(localWebUrl(promptCtx)),
+        text: () => webSurfacePrompt(localWebUrl(promptCtx, config.publicUrl)),
       })
     })
     ctx.inject(['shellEnv'], (runtimeCtx) => {
@@ -152,7 +158,7 @@ export function apply(ctx: Context, config: Config): void {
         variables: {
           [DSH_WEB_URL]: { description: 'Canonical local URL of the DeepSeek Harness Web GUI serving this session.' },
         },
-        resolve: () => ({ [DSH_WEB_URL]: localWebUrl(runtimeCtx) }),
+        resolve: () => ({ [DSH_WEB_URL]: localWebUrl(runtimeCtx, config.publicUrl) }),
       })
     })
   }
@@ -165,7 +171,11 @@ export function apply(ctx: Context, config: Config): void {
       // Reuse the exact LAN snapshot provided to the /api trust fence.
       const lanCandidate = runtime.lanAddresses[0]
       const port = ctx.webServer.port
-      console.log(`dsh web: ${localWebUrl(ctx)}${lanCandidate === undefined ? '' : ` (LAN: http://${lanCandidate}:${String(port)})`}`)
+      const url = localWebUrl(ctx, config.publicUrl)
+      const lanUrl = config.publicUrl === undefined && lanCandidate !== undefined
+        ? ` (LAN: ${ctx.webServer.protocol}://${lanCandidate}:${String(port)})`
+        : ''
+      console.log(`dsh web: ${url}${lanUrl}`)
     }
     // This row's own activation can precede a sibling failure. The app owns
     // readiness by waiting for its Loader tree, or prints at once in a

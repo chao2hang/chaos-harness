@@ -109,15 +109,32 @@
 
     # ── layer 2: transport/service ──────────────────────────────────────────────
 
+    # Resolve remote-access credentials before the listener can bind. The
+    # consumer rows inject this service rather than relying on row order.
+    - id: web-auth-preflight
+      name: '@deepseek-ai/dsh-host-web-auth/preflight'
+      inject: [webStartup]
+      config:
+        mode: !!js ctx.webStartup.auth
+
     # Plain route-registration carrier; host and port come from the app's
     # webStartup provider, with these deployment fallbacks. The dist is served by
     # the web-runtime row below through the fallback seat.
     - id: webserver
       name: '@deepseek-ai/dsh-host-webserver'
-      inject: [webStartup]
+      inject: [webStartup, webAuthToken]
       config:
         host: !!js ctx.webStartup.host ?? '127.0.0.1'
         port: !!js ctx.webStartup.port ?? 3080
+        tlsCert: !!js ctx.webStartup.tlsCert
+        tlsKey: !!js ctx.webStartup.tlsKey
+
+    - id: web-auth
+      name: '@deepseek-ai/dsh-host-web-auth'
+      inject: [webStartup, webAuthToken]
+      config:
+        mode: !!js ctx.webStartup.auth
+        secureCookie: !!js ctx.webStartup.tlsCert !== undefined || ctx.webStartup.publicUrl !== undefined
 
     # Web glue owned by this bundle: resolves the built frontend dist (an
     # assembly fact of dsh-web-app, never user config), mounts the
@@ -133,6 +150,7 @@
       config:
         printUrl: true
         surfaceContext: true
+        publicUrl: !!js ctx.webStartup.publicUrl
         trustedHosts: !!js ctx.webStartup.trustedHosts
 
     # The client-plugin reload chain, always mounted: it is idle until a
@@ -157,9 +175,8 @@
       name: '@deepseek-ai/dsh-client-connection'
       inject: [webRuntime]
       config:
-        # LAN literals derived from the active bind plus --trusted-host extras.
-        # A deployment adding authorities keeps this expression and concatenates
-        # its literals, for example: ['app.internal', ...ctx.webRuntime.trustedHosts].
+        # LAN literals, the configured reverse-proxy authority, and
+        # --trusted-host extras derived from the active deployment.
         trustedHosts: !!js ctx.webRuntime.trustedHosts
 
     - id: api-remotes

@@ -35,10 +35,14 @@ interface Config {
   host: '127.0.0.1' | '0.0.0.0'
   /** Listen port; zero requests an OS-assigned port. */
   port: number
+  /** PEM certificate path; must be configured with tlsKey. */
+  tlsCert?: string
+  /** PEM private-key path; must be configured with tlsCert. */
+  tlsKey?: string
 }
 ```
 
-`host` 只接受 `127.0.0.1`（默认姿态）和 `0.0.0.0`（刻意的网络暴露）；没有 TLS、认证或 origin 策略，因此绑定到非回环地址会把服务器暴露给该网络。dist 位置是认领席位的前端插件的组装事实。
+`host` 只接受 `127.0.0.1`（默认姿态）和 `0.0.0.0`（刻意的网络暴露）。成对配置 `tlsCert` 和 `tlsKey` 会创建 HTTPS 监听器；单独配置任一字段都会使激活失败。认证与浏览器来源策略由组合插件负责。dist 位置是认领席位的前端插件的组装事实。
 
 ## 服务
 
@@ -54,6 +58,14 @@ interface Config {
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxwebauthtoken--webauthtoken"></a>
+
+### `ctx.webAuthToken` — `WebAuthToken`
+
+Process-local Web authentication token state.
+
+Source: [`packages/host/web-auth/src/preflight.ts:14`](../../packages/host/web-auth/src/preflight.ts)
+
 <a id="ctxwebserver--webserver"></a>
 
 ### `ctx.webServer` — `WebServer`
@@ -68,6 +80,22 @@ The browser HTTP carrier service. Activation listens immediately. Route registra
  * @returns the disposer removing the route.
  */
 register(route: WebRoute): () => void
+
+/**
+ * Register a request guard. Guards run in registration order before route or
+ * fallback dispatch; a rejecting guard owns its response and stops dispatch.
+ * @param guard - returns whether the request may reach a route.
+ * @returns the disposer removing the guard.
+ */
+registerGuard(guard: WebRequestGuard): () => void
+
+/**
+ * Register an upgrade guard. Guards run in registration order before upgrade
+ * route dispatch; a rejecting guard owns and closes its socket.
+ * @param guard - returns whether the upgrade may reach its route.
+ * @returns the disposer removing the guard.
+ */
+registerUpgradeGuard(guard: WebUpgradeGuard): () => void
 
 /**
  * Register an exact-path HTTP upgrade route. Duplicate paths throw because
@@ -104,5 +132,5 @@ tapIndex(transform: (html: string) => string): () => void
 applyIndexTaps(html: string): string
 ```
 
-Source: [`packages/host/webserver/src/index.ts:59`](../../packages/host/webserver/src/index.ts)
+Source: [`packages/host/webserver/src/index.ts:71`](../../packages/host/webserver/src/index.ts)
 <!-- END GENERATED cordis-surface -->

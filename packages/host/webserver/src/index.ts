@@ -8,8 +8,10 @@
  * IPC bridge. This package never prints: the URL line belongs to the shell.
  */
 
-import { createServer } from 'node:http'
+import { readFile } from 'node:fs/promises'
+import { createServer as createHttpServer } from 'node:http'
 import type { IncomingMessage, ServerResponse, Server } from 'node:http'
+import { createServer as createHttpsServer } from 'node:https'
 import type { AddressInfo } from 'node:net'
 import type { Duplex } from 'node:stream'
 import { Context, Service } from '@deepseek-ai/cordis'
@@ -33,6 +35,12 @@ export interface WebRoute {
   handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
 }
 
+/** A request guard that owns a rejection response when it returns false. */
+export type WebRequestGuard = (req: IncomingMessage, res: ServerResponse, pathname: string) => boolean | Promise<boolean>
+
+/** An upgrade guard that owns the socket when it returns false. */
+export type WebUpgradeGuard = (req: IncomingMessage, socket: Duplex, pathname: string) => boolean | Promise<boolean>
+
 /** One exact-path HTTP upgrade registration. */
 export interface WebUpgradeRoute {
   /** Absolute pathname, no trailing slash. */
@@ -47,6 +55,10 @@ export interface Config {
   host: '127.0.0.1' | '0.0.0.0'
   /** Listen port; zero requests an OS-assigned port. */
   port: number
+  /** PEM certificate path; must be configured with tlsKey. */
+  tlsCert?: string
+  /** PEM private-key path; must be configured with tlsCert. */
+  tlsKey?: string
 }
 
 /**
@@ -60,11 +72,15 @@ export class WebServer extends Service {
   static Config: z<Config> = z.object({
     host: z.union([z.const('127.0.0.1'), z.const('0.0.0.0')]).required(),
     port: z.natural().max(65535).required(),
+    tlsCert: z.string(),
+    tlsKey: z.string(),
   })
 
   private readonly exact = new Map<string, WebRoute>()
   private readonly prefixes = new Map<string, WebRoute>()
   private readonly upgrades = new Map<string, WebUpgradeRoute>()
+  private readonly requestGuards: WebRequestGuard[] = []
+  private readonly upgradeGuards: WebUpgradeGuard[] = []
   private readonly upgradedSockets = new Set<Duplex>()
   private readonly indexTaps: ((html: string) => string)[] = []
   private fallback: WebRoute['handler'] | undefined
@@ -85,6 +101,11 @@ export class WebServer extends Service {
     return this.config.host
   }
 
+  /** Whether the active listener uses HTTP or HTTPS. */
+  get protocol(): 'http' | 'https' {
+    return this.config.tlsCert === undefined ? 'http' : 'https'
+  }
+
   /**
    * Register a named route. Duplicate (kind, path) throws — route patterns are
    * a composition-level contract, so a collision is a misconfiguration.
@@ -98,6 +119,34 @@ export class WebServer extends Service {
     }
     table.set(route.path, route)
     return () => { table.delete(route.path) }
+  }
+
+  /**
+   * Register a request guard. Guards run in registration order before route or
+   * fallback dispatch; a rejecting guard owns its response and stops dispatch.
+   * @param guard - returns whether the request may reach a route.
+   * @returns the disposer removing the guard.
+   */
+  registerGuard(guard: WebRequestGuard): () => void {
+    this.requestGuards.push(guard)
+    return () => {
+      const at = this.requestGuards.indexOf(guard)
+      if (at !== -1) this.requestGuards.splice(at, 1)
+    }
+  }
+
+  /**
+   * Register an upgrade guard. Guards run in registration order before upgrade
+   * route dispatch; a rejecting guard owns and closes its socket.
+   * @param guard - returns whether the upgrade may reach its route.
+   * @returns the disposer removing the guard.
+   */
+  registerUpgradeGuard(guard: WebUpgradeGuard): () => void {
+    this.upgradeGuards.push(guard)
+    return () => {
+      const at = this.upgradeGuards.indexOf(guard)
+      if (at !== -1) this.upgradeGuards.splice(at, 1)
+    }
   }
 
   /**
@@ -146,10 +195,21 @@ export class WebServer extends Service {
 
   /** Listen; resolves once the socket is bound (rejection = FAILED fiber). */
   async [Service.init](): Promise<void> {
+    const { tlsCert, tlsKey } = this.config
+    if ((tlsCert === undefined) !== (tlsKey === undefined)) {
+      throw new Error('webserver: tlsCert and tlsKey must be configured together')
+    }
+    const tls = tlsCert === undefined || tlsKey === undefined ? undefined : {
+      cert: await readFile(tlsCert),
+      key: await readFile(tlsKey),
+    }
     const handle = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       /* v8 ignore next -- `?? '/'` arm: node:http always sets url on server
       requests; the field is only optional on the client-side IncomingMessage type */
       const rawPath = new URL(req.url ?? '/', 'http://x').pathname
+      for (const guard of [...this.requestGuards]) {
+        if (!await guard(req, res, rawPath)) return
+      }
       const route = this.match(rawPath)
       if (route !== undefined) {
         await route.handler(req, res)
@@ -167,7 +227,7 @@ export class WebServer extends Service {
     // rejection killing the process on one malformed request (bad %-escape,
     // client dropping mid-body). Per-request failures log and answer 400 —
     // never a process exit.
-    this.server = createServer((req, res) => {
+    const requestListener = (req: IncomingMessage, res: ServerResponse): void => {
       handle(req, res).catch((err: unknown) => {
         this.ctx.logger.warn(err instanceof Error ? err : new Error(String(err)))
         if (res.headersSent) {
@@ -177,8 +237,11 @@ export class WebServer extends Service {
         res.writeHead(400)
         res.end()
       })
-    })
-    this.server.on('upgrade', (req, socket, head) => {
+    }
+    this.server = tls === undefined
+      ? createHttpServer(requestListener)
+      : createHttpsServer(tls, requestListener)
+    const handleUpgrade = async (req: IncomingMessage, socket: Duplex, head: Buffer): Promise<void> => {
       const onError = (error: Error): void => {
         this.ctx.logger.warn(error)
         socket.destroy()
@@ -201,6 +264,16 @@ export class WebServer extends Service {
         socket.destroy()
         return
       }
+      try {
+        const pathname = new URL(req.url ?? '/', 'http://x').pathname
+        for (const guard of [...this.upgradeGuards]) {
+          if (!await guard(req, socket, pathname)) return
+        }
+      } catch (error) {
+        this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+        socket.destroy()
+        return
+      }
       this.upgradedSockets.add(socket)
       try {
         Promise.resolve(route.handler(req, socket, head)).catch((error: unknown) => {
@@ -211,6 +284,12 @@ export class WebServer extends Service {
         this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
         socket.destroy()
       }
+    }
+    this.server.on('upgrade', (req, socket, head) => {
+      handleUpgrade(req, socket, head).catch((error: unknown) => {
+        this.ctx.logger.warn(error instanceof Error ? error : new Error(String(error)))
+        socket.destroy()
+      })
     })
 
     await new Promise<void>((resolve, reject) => {

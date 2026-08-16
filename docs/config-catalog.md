@@ -785,6 +785,27 @@ export interface Config {
 
 Source: [`packages/host/frontend-static/src/index.ts:28`](../packages/host/frontend-static/src/index.ts)
 
+<a id="deepseek-aidsh-host-web-auth"></a>
+
+## `@deepseek-ai/dsh-host-web-auth`
+
+Requires: `WEB_AUTH_TOKEN_SERVICE` · `webServer`
+
+```ts config-catalog
+/** Plugin configuration. */
+export interface Config {
+  /** `off` preserves local anonymous development; `required` protects every non-auth path. */
+  mode: WebAuthMode
+  /** Set Secure on the session cookie for built-in or proxy TLS. */
+  secureCookie: boolean
+}
+
+/** Authentication modes supported by the Web shell. */
+export type WebAuthMode = 'off' | 'required'
+```
+
+Source: [`packages/host/web-auth/src/index.ts:19`](../packages/host/web-auth/src/index.ts)
+
 <a id="deepseek-aidsh-host-webserver"></a>
 
 ## `@deepseek-ai/dsh-host-webserver`
@@ -796,10 +817,14 @@ export interface Config {
   host: '127.0.0.1' | '0.0.0.0'
   /** Listen port; zero requests an OS-assigned port. */
   port: number
+  /** PEM certificate path; must be configured with tlsKey. */
+  tlsCert?: string
+  /** PEM private-key path; must be configured with tlsCert. */
+  tlsKey?: string
 }
 ```
 
-Source: [`packages/host/webserver/src/index.ts:45`](../packages/host/webserver/src/index.ts)
+Source: [`packages/host/webserver/src/index.ts:53`](../packages/host/webserver/src/index.ts)
 
 <a id="deepseek-aidsh-invariants"></a>
 
@@ -2882,6 +2907,8 @@ export interface Config {
    * orientation text would be false.
    */
   surfaceContext: boolean
+  /** Explicit public HTTPS URL when a reverse proxy terminates TLS. */
+  publicUrl?: string
   /** Explicit `--trusted-host` authorities from this invocation. */
   trustedHosts: string[]
 }

@@ -113,6 +113,18 @@ describe('real Loader composition', () => {
     expect(await request(port, '/api')).toMatchObject({ status: 200, body: 'API' })
     expect(await request(port, '/api/anything', { method: 'POST' })).toMatchObject({ status: 200, body: 'API' })
 
+    // Guards run before every HTTP dispatch, own a rejection, and dispose
+    // symmetrically. This is the composition point for deployment auth.
+    const disposeGuard = server.registerGuard((_req, res, pathname) => {
+      if (pathname !== '/guarded') return true
+      res.writeHead(401)
+      res.end('AUTH')
+      return false
+    })
+    expect(await request(port, '/guarded')).toMatchObject({ status: 401, body: 'AUTH' })
+    disposeGuard()
+    expect((await request(port, '/guarded')).status).toBe(404)
+
     // Fallback seat: 404 while unclaimed; the owner answers everything no
     // named route matches; index taps are the owner's to apply; the seat
     // admits exactly one owner and the disposer releases it.
@@ -156,6 +168,27 @@ describe('real Loader composition', () => {
     // become registrable again after disposal. The accepted socket stays open
     // so the teardown assertion also covers upgraded-connection ownership.
     let upgradedServerClosed = false
+    server.registerUpgrade({ path: '/blocked-events', handler: () => {} })
+    const disposeUpgradeGuard = server.registerUpgradeGuard((_req, socket, pathname) => {
+      if (pathname !== '/blocked-events') return true
+      socket.destroy()
+      return false
+    })
+    const blockedUpgrade = connect(port, '127.0.0.1')
+    blockedUpgrade.on('error', () => { /* The guard owns the rejected socket. */ })
+    await once(blockedUpgrade, 'connect')
+    const blockedUpgradeClosed = once(blockedUpgrade, 'close')
+    blockedUpgrade.write([
+      'GET /blocked-events HTTP/1.1',
+      `Host: 127.0.0.1:${String(port)}`,
+      'Connection: Upgrade',
+      'Upgrade: dsh-test',
+      '',
+      '',
+    ].join('\r\n'))
+    await blockedUpgradeClosed
+    disposeUpgradeGuard()
+
     const disposeUpgrade = server.registerUpgrade({
       path: '/events',
       handler: (_req, socket) => {

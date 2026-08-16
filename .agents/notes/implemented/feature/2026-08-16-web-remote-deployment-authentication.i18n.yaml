@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-16-web-remote-deployment-authentication.md
+2026-08-16-web-remote-deployment-authentication.md: 686f0fdc36c430d7ab25c8f12bd6c88184569ea5
+2026-08-16-web-remote-deployment-authentication.zh.md: 6178d5b896448a1a9b318ed5d94d95008c71c353

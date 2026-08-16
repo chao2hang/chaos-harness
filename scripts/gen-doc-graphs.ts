@@ -514,6 +514,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes.',
   },
   {
+    key: 'webAuthToken',
+    pkg: 'web-auth',
+    title: 'Web authentication preflight',
+    mode: 'core',
+    consumers: ['webserver', 'web-auth'],
+    note: 'Resolves the deployment token before the listener activates; the auth plugin consumes the process-local result to protect HTTP and WebSocket traffic.',
+  },
+  {
     key: 'clientModules',
     pkg: 'modules',
     title: 'Client plugin graph host',

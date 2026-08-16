@@ -14,13 +14,21 @@ DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. *
 
 ### Run from `npm`
 
-Install `Node.js`, then run:
+Install `Node.js`, then install and run `dsh`:
 
 ```sh
-npx @deepseek-ai/dsh web
+npm install --global @deepseek-ai/dsh
+dsh web
 ```
 
-The command starts the Web UI, served at `http://127.0.0.1:3080` by default. See [Web UI guide](docs/user/guide/index.md).
+The command starts the Web UI, served at `http://127.0.0.1:3080` by default. For a remote HTTPS deployment behind a reverse proxy, configure an access token and its public URL:
+
+```sh
+export DSH_WEB_TOKEN='replace-with-a-random-token'
+dsh web --host 0.0.0.0 --auth required --public-url https://dsh.example.com
+```
+
+See the [Web UI guide](docs/user/guide/index.md) for TLS and deployment options.
 
 ### Run from source
 

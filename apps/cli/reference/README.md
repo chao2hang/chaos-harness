@@ -24,7 +24,7 @@ The shipped apps own these command lines:
 
 | Profile | Arguments |
 |---|---|
-| `web` | `--host`, `--port`, repeatable `--trusted-host` |
+| `web` | `--auth`, `--host`, `--port`, `--tls-cert`, `--tls-key`, `--public-url`, repeatable `--trusted-host` |
 | `headless` | the task text, as the positional argument |
 
 A one-shot task (`dsh --profile headless "run the tests"`) creates one fresh persisted Agent through the core registry, submits the task, waits for quiescence, and flushes the Session before deriving the last non-empty assistant text and final `turn/end` reason from its durable interval. It prints the text on stdout and exits 0 for `completed`, else 1. An invocation with no task is a usage error from that app. The shipped headless profile mounts no ApiProxy, Host, HTTP server, Web runtime, or browser client; a successful run writes nothing to stderr and opens no listening port.
@@ -52,7 +52,7 @@ Git-hosted plugins that ship sources build during install through their `prepare
 
 ## Web alias
 
-`dsh web` is a hardcoded alias for `--profile web`; the flags after it belong to the web app, whose ordinary bundle provider parses them. `--host` and `--port` override the composed values of the rows that carry them, and repeatable `--trusted-host` contributes invocation authorities through `ctx.webRuntime.trustedHosts` (a deployment expression concatenates its own authorities). The client-plugin HMR receiver is always mounted and stays idle until a separate `pnpm run dev:web` watcher rebuilds client bundles.
+`dsh web` is a hardcoded alias for `--profile web`; the flags after it belong to the web app, whose ordinary bundle provider parses them. `--host` and `--port` override the composed values of the rows that carry them. `--auth required` resolves `DSH_WEB_TOKEN`, accepts it only on `/auth/login`, and grants an HttpOnly same-origin session cookie; the token is not written to browser storage. `--tls-cert` and `--tls-key` enable built-in HTTPS and must be supplied as a pair. `--public-url https://…` names the external HTTPS URL when a reverse proxy terminates TLS; its authority joins the `/api` browser-trust fence. Repeatable `--trusted-host` adds further named authorities. `--host 0.0.0.0` requires `--auth required` and either paired built-in TLS files or an HTTPS public URL. The client-plugin HMR receiver is always mounted and stays idle until a separate `pnpm run dev:web` watcher rebuilds client bundles.
 
 ```sh
 dsh web
@@ -61,7 +61,7 @@ dsh web --dump-config
 dsh web --help
 ```
 
-The production Web runner needs built package and frontend artifacts (`pnpm run build`). It serves `http://127.0.0.1:3080` by default. The CLI intentionally does not support `--host 0.0.0.0` yet and exits with a usage error; `--trusted-host` adds named authorities accepted by the `/api` browser-trust fence.
+The production Web runner needs built package and frontend artifacts (`pnpm run build`). It serves `http://127.0.0.1:3080` without authentication by default. A remote deployment sets `DSH_WEB_TOKEN` in the launch environment or managed credential store, then uses either built-in TLS or a reverse proxy with an explicit public HTTPS URL. `--trusted-host` adds named authorities accepted by the `/api` browser-trust fence; it is a DNS-rebinding defense, not authentication.
 
 Process shutdown gives the plugin tree up to five seconds to dispose. The first `SIGINT`/`SIGTERM` starts that graceful drain — `SIGTERM` is a supervisor's ordinary stop request and exits 0 on every surface, `SIGINT` reports 130; a second signal forces immediate exit. If one-shot normal completion is already stuck in disposal, the first `Ctrl+C` is the escalation and exits immediately instead of being swallowed.
 
