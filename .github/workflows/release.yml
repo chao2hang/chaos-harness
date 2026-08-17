@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: Publish the packed tarballs to npm. Must run from a dsh-v* tag.
+        description: Publish npm packages and GitHub Release archives. Must run from a dsh-v* tag.
         required: true
         type: boolean
         default: false
@@ -147,3 +147,113 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: pnpm run release:publish --family dsh --from dist/npm
+
+  portable:
+    name: Portable ${{ matrix.platform }}-${{ matrix.arch }}
+    if: inputs.publish
+    needs: pack
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+            arch: x64
+          - runner: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+          - runner: macos-15-intel
+            platform: darwin
+            arch: x64
+          - runner: macos-15
+            platform: darwin
+            arch: arm64
+          - runner: windows-2025
+            platform: win32
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dsh-npm-tarballs
+          path: dist/npm
+
+      - name: Pack vendored framework
+        run: pnpm run release:pack --family vendor --out dist/npm-vendor
+
+      - name: Build Landlock launcher
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -yq musl-tools
+          pnpm --dir native/landlock-run run build:ts
+          pnpm --dir native/landlock-run run build:native
+          pnpm --dir native/landlock-run run release:pack -- "$GITHUB_WORKSPACE/dist/npm-landlock" --current-platform-only
+
+      - name: Pack Landlock entry
+        if: runner.os == 'macOS'
+        run: pnpm --dir native/landlock-run run build:ts && pnpm --dir native/landlock-run/packages/entry pack --pack-destination "$PWD/dist/npm-landlock"
+
+      - name: Pack Landlock entry (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          pnpm --dir native/landlock-run run build:ts
+          pnpm --dir native/landlock-run/packages/entry pack --pack-destination "$PWD/dist/npm-landlock"
+
+      - name: Build portable archive
+        run: pnpm run release:pack-portable --from dist/npm --from dist/npm-vendor --from dist/npm-landlock --out dist/portable --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dsh-portable-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/portable/*
+          if-no-files-found: error
+          retention-days: 7
+
+  github-release:
+    name: Publish GitHub Release assets
+    if: inputs.publish
+    needs: portable
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dsh-portable-*
+          path: dist/portable
+          merge-multiple: true
+
+      - name: Create checksums
+        working-directory: dist/portable
+        run: sha256sum dsh-*.tar.gz > SHA256SUMS
+
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then prerelease=(--prerelease); fi
+          if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "$GITHUB_REF_NAME" "${prerelease[@]}"
+          fi
+          gh release upload "$GITHUB_REF_NAME" dist/portable/* --repo "$GITHUB_REPOSITORY" --clobber

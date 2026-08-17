@@ -12,16 +12,25 @@ DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. *
 
 ## Run
 
-### Run from `npm`
+### Install from GitHub Releases
 
-Install `Node.js`, then install and run `dsh`:
+Install [Node.js 22.19 or newer](https://nodejs.org/), then download the latest self-contained release from GitHub:
 
 ```sh
-npm install --global @deepseek-ai/dsh
+curl -fsSL https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/scripts/install.mjs | node --input-type=module
 dsh web
 ```
 
-The command starts the Web UI, served at `http://127.0.0.1:3080` by default. For a remote HTTPS deployment behind a reverse proxy, configure an access token and its public URL:
+The installer verifies the archive against the release's `SHA256SUMS`, installs it under `~/.local/share/dsh`, and places the launcher in `~/.local/bin`. It never contacts npmjs. Set `DSH_VERSION` to install a specific version or `DSH_INSTALL_DIR` and `DSH_BIN_DIR` to choose other locations.
+
+On Windows, run the equivalent command in PowerShell; the launcher is installed under `%LOCALAPPDATA%\DeepSeek Harness\bin`:
+
+```powershell
+irm https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/scripts/install.mjs | node --input-type=module
+dsh web
+```
+
+`dsh web` starts the Web UI, served at `http://127.0.0.1:3080` by default. For a remote HTTPS deployment behind a reverse proxy, configure an access token and its public URL:
 
 ```sh
 export DSH_WEB_TOKEN='replace-with-a-random-token'

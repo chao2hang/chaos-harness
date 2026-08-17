@@ -12,16 +12,25 @@ DeepSeek Harness 目前处于 _开发者预览_ 阶段，正在快速迭代。**
 
 ## 运行
 
-### 通过 `npm` 运行
+### 从 GitHub Releases 安装
 
-安装 `Node.js`，然后全局安装并运行 `dsh`：
+安装 [Node.js 22.19 或更高版本](https://nodejs.org/)，然后从 GitHub 下载最新的自包含版本：
 
 ```sh
-npm install --global @deepseek-ai/dsh
+curl -fsSL https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/scripts/install.mjs | node --input-type=module
 dsh web
 ```
 
-该命令会启动 Web UI，默认地址为 `http://127.0.0.1:3080`。通过反向代理部署远程 HTTPS 时，请配置访问令牌和公网地址：
+安装器会使用 Release 中的 `SHA256SUMS` 校验归档，将程序安装到 `~/.local/share/dsh`，并把启动器放到 `~/.local/bin`；整个安装过程不会访问 npmjs。可通过 `DSH_VERSION` 安装指定版本，也可通过 `DSH_INSTALL_DIR` 和 `DSH_BIN_DIR` 指定其他目录。
+
+Windows 用户可在 PowerShell 中运行等效命令；启动器将安装到 `%LOCALAPPDATA%\DeepSeek Harness\bin`：
+
+```powershell
+irm https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/scripts/install.mjs | node --input-type=module
+dsh web
+```
+
+`dsh web` 会启动 Web UI，默认地址为 `http://127.0.0.1:3080`。通过反向代理部署远程 HTTPS 时，请配置访问令牌和公网地址：
 
 ```sh
 export DSH_WEB_TOKEN='replace-with-a-random-token'
