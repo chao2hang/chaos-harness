@@ -120,7 +120,7 @@ The `apps/web/tests/**` e2e type-check in the root **`tsconfig.host.json`**: the
 
 That yields a discipline this design depends on: **when those tests import a value or a type from a Client package, they pull that package's whole project — and every project it references — into the Host build graph**. Four consumers (`ui-settings-general`, `ui-settings-models`, `ui-permission`, `ui-commands`) reference `api/remotes`' Client face, and that face cannot compile until Host tsdown has generated `@deepseek-ai/dsh-goal/remote`. The result is a build-order deadlock: Host tsc needs the Client face, which needs the generated artifact, which Host tsdown produces after Host tsc.
 
-The few Client-owned symbols are therefore **mirrored** on the test side (`scaffold.ts` exports the mirrored welcome-notice constants; the two chat e2e keep importing `dsh-client-runtime/client` because the `runtime` project is already in the Host graph), which lets those four consumers leave the Host graph. The 15 Client project references in `apps/cli/tsconfig.json` lost their owner-map role and are gone. Each mirrored value matches its source verbatim; a drift shows up as a missed selector or an unsuppressed notice, both loud failures.
+The remaining Client-owned symbol used by these tests stays on an already-reachable path: two chat e2e import `dsh-client-runtime/client` because the `runtime` project is already in the Host graph. No browser e2e imports a feature-client package, which lets those consumers remain outside the Host graph. The 15 Client project references in `apps/cli/tsconfig.json` lost their owner-map role and are gone.
 
 ### Change inventory
 
@@ -136,7 +136,7 @@ The few Client-owned symbols are therefore **mirrored** on the test side (`scaff
 | `client/runtime` | The five Client-event bridge branches collapse into `ctx.remote.$dispatch(frame.event, frame.args)`, adding a `remote` injection and deleting their duplicated `Events` declarations |
 | Seven consumers | ui-commands / ui-model-selection / ui-settings-models / ui-settings-general / ui-permission / ui-agent-preset / ui-skill subscribe through `ctx.remote.$on(...)`, following `ui-goal`'s precedent for the type-only facade import and the `'remote'` injection |
 | `client/connection` | The fixture's `emitHost` produces `host/remote-event` |
-| `apps/web/tests` + `apps/cli` | Client symbols mirrored on the test side (see above); `apps/cli/tsconfig.json` drops its 15 Client project references |
+| `apps/web/tests` + `apps/cli` | Browser e2e avoid feature-client imports; `apps/cli/tsconfig.json` drops its 15 Client project references |
 
 ## Alternatives considered
 
@@ -150,7 +150,7 @@ The few Client-owned symbols are therefore **mirrored** on the test side (`scaff
 
 **Move the apps/web browser e2e into the Client aggregate.** "Client tests belong to the Client face" looks right and fails immediately with 21 errors: those tests use Host services, and in the Client program `ctx.sessions` is `ISessions`.
 
-**Split `directory-picker-browse`/`-native` into Host and Client faces** so no Client package reaches the Host graph. The direction is right — they are genuinely unsplit dual-half packages — but the change lands in another owner's packages and buys only a cleaner build graph; once this design mirrors the Client symbols on the test side, it no longer needs the split. **Assessed and declined.**
+**Split `directory-picker-browse`/`-native` into Host and Client faces** so no Client package reaches the Host graph. The direction is right — they are genuinely unsplit dual-half packages — but the change lands in another owner's packages and buys only a cleaner build graph. Browser e2e avoid feature-client imports, while the two runtime imports already resolve through the Host graph, so this design does not need the split. **Assessed and declined.**
 
 ## Verification
 
@@ -170,7 +170,7 @@ What pins this behavior:
 - **Two files break api/remotes' face-disjointness contract.** `src/remote-events.ts` and `src/types.ts` belong to both projects, so each emits an identical declaration into the shared `lib/types`. Content is byte-identical and the `.tsbuildinfo` files stay separate, so this is harmless in practice; the README's build-boundary section states the exception and its cause (the `paths` entry points at source).
 - **The carrier handoff is developer-visible.** Any Client plugin holding `ctx.remote` can call `$dispatch` and synthesize a forwarded event. That exposure predates the verb — `ctx.emit` was equally reachable while an internal event relayed the frame — and matches what `connection/reset` already allows for a fabricated reconnect; the Client is one trust domain. Tests pin the handoff-to-`$on` conversion and do not pretend the port authenticates its caller.
 - **A malformed argument fails in the emitter's containment, not at load.** `assertJsonArgs` throws inside the forwarding listener, so the emitting seam's listener containment logs it and drops that frame: loud in the Host log rather than at load or at the emit point.
-- **Mirrored test values can drift.** Nothing mechanically checks the Client constants mirrored in `apps/web/tests` against their source; the safety net is only that a drift misses a selector. The rule lives in `apps/web/tests/README.md` and is held by review — a grep-level gate was considered and deliberately skipped.
+- **Future test mirrors remain review-owned.** Browser e2e currently mirror no feature-client value. If a scenario later needs one, `apps/web/tests/README.md` requires an adjacent commented source import; no gate compares that value mechanically because the current corpus has nothing to compare.
 - **Capabilities given up.** No projected or redacted payloads, no Scope-bound events (`agentCtx.remote.$on`), and no replay on reconnect — these are pure invalidation signals, and `connection/reset` already covers refetching after a reconnect. The mux stream's session events, answerable frames, and snapshot baselines stay out of scope.
 - **Client packages remain in the Host graph.** Twelve projects (`connection`, `runtime`, `ui-slots`, and kin) still reach it through the unsplit `directory-picker-browse`/`-native` pair and `api/gateway → client/connection`. They compile and no longer implicate api/remotes' Client face, so they did not block this change; splitting those packages would remove a few but was assessed and declined. The two chat e2e importing `dsh-client-runtime/client` rely on `runtime` already being in that graph — incidental, not a guarantee.
 - **The invariant companion holds no runtime check.** An earlier revision asserted the dispatch shape (`thisArg === null`, `mode === 'emit'`) over the live event bus, which coupled the companion to the allowlist value and made rolldown hoist it into a third bundle chunk the mechanical publication list does not carry. The Host face's `TypertForwardableEvent` assertion already refuses both deviations at compile time, so the companion is an explained empty installer.

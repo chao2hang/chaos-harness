@@ -6,28 +6,28 @@ English | [中文](2026-07-30-versioned-gui-welcome-onboarding.zh.md)
 
 ## Problem
 
-The GUI's credential onboarding begins with a DeepSeek-specific readiness check, but the internal-test notice applies to every user and must precede provider setup even when a credential is already configured. Treating both as independent overlays permits simultaneous dialogs, while a process-local dismissal cannot distinguish a completed notice from a window closed before acknowledgement or intentionally present revised copy once.
+The Settings shell needs deterministic ownership for feature-provided first-run steps so independent dialogs cannot stack. A former product welcome step also introduced a durable acknowledgement field. The dialog is absent from the current product, but the coordinator and existing settings documents remain, so the live design must distinguish active onboarding behavior from compatibility data.
 
 ## Decision
 
-**The Settings shell coordinates ordered steps.** `settings.onboarding` remains a root-scoped list, but `ui-settings` projects its entry ids and order into one coordinator and mounts only the first incomplete step. The active registrant receives `complete()` and `openSection(id)`; no later step mounts until ownership transfers. `ui-settings-models` now registers the restored welcome notice at order `-100` and the conditional DeepSeek credential step at order `0`; their current shared presentation is owned by the [shared-modal onboarding decision](2026-08-13-shared-modal-product-onboarding.md).
+**The Settings shell coordinates ordered steps.** `settings.onboarding` remains a root-scoped list, and `ui-settings` projects its entry ids and order into one coordinator that mounts only the first incomplete step. The active registrant receives `complete()` and `openSection(id)`; no later step mounts until ownership transfers. `ui-settings-models` currently registers only the conditional DeepSeek credential step at order `0`.
 
-**The product welcome step is versioned and feature-owned.** The notice was historically removed by the [first-run beta notice removal](../simplification/2026-08-13-remove-first-run-beta-notice.md) and is now restored in `ui-settings-models` with new testing-stage copy. `ui-settings-general` still seats no onboarding step; the plugin that owns both current steps also owns the copy, store, and shared modal.
+**The welcome-step decision is superseded.** The [internal-testing dialog removal](../simplification/2026-08-17-remove-internal-testing-dialog.md) removes the `welcome-notice` registration, component, copy, acknowledgement store, and browser behavior. No local or remote browser displays or acknowledges product-stage prose.
 
-**The durable `ui-onboarding` section owns acknowledgement.** The Host half registers it in the user-settings seam under the active `$DSH_HOME/settings.yaml`; the current welcome store reads and writes `welcomeNoticeVersion` through the existing public settings API. The connection plugin publishes whether the current page uses a loopback authority as `ctx.connection.isLoopback`; hostname classification remains internal to the connection package, and other client plugins consume the service state instead of importing its implementation. The API proxy exposes this one product namespace through a closed allowlist beside configurable-provider namespaces, without treating its changes as model-catalog invalidations.
+**The durable `ui-onboarding` section is compatibility-only.** The Host registers `welcomeNoticeVersion` under the active `$DSH_HOME/settings.yaml` so documents written by the former step remain valid. API Proxy does not expose the namespace, and no browser plugin reads, writes, or subscribes to it.
 
-**Visible onboarding uses one shared modal contract.** Both current steps render through the same body-portaled `OnboardingModal`, and the underlying app root stays inert only while a dialog is visible. The shell renders no wrapper while a step loads its private facts. Explicit actions transfer coordinator ownership; Escape and mask clicks do not acknowledge or skip a step.
+**Visible onboarding owns its modal contract.** The current DeepSeek credential step renders through body-portaled `OnboardingModal`, and the underlying app root stays inert only while that dialog is visible. The shell renders no wrapper while the step loads its private facts. Explicit actions transfer coordinator ownership; Escape and mask clicks do not complete the step.
 
 ## Alternatives considered
 
-**Browser local storage** — rejected because acknowledgement would follow one browser profile rather than `$DSH_HOME`; a fresh Harness profile could incorrectly inherit a prior acknowledgement, and external profile edits would have no authoritative update stream. Non-loopback fallback therefore remains process-local rather than browser-profile-local.
+**Remove the coordinator with the welcome dialog.** Rejected because the conditional credential form remains feature-owned onboarding, and the shell still needs one generic ordering and completion mechanism for current and future steps.
 
-**A second independent modal in `ui-settings-general`** — rejected because list registrants would still stack whenever welcome and credential readiness were both true. Ordered ownership belongs to the shell that declares and renders the list.
+**Delete the historical settings section.** Rejected because existing Harness homes may contain `ui-onboarding.welcomeNoticeVersion`; retaining its schema keeps those documents valid without exposing a browser capability.
 
-**Persisting on render or window close** — rejected because observation is not acknowledgement and close delivery is unreliable. Only the explicit Continue commit may suppress the next launch.
+**Keep the welcome dialog in browser local storage.** Rejected because product-stage prose does not justify any completion state, and browser-profile persistence would diverge from Harness-profile ownership.
 
-**A generic public settings-exposure flag** — rejected because one product namespace does not justify widening every settings registrant's public configuration surface. The gateway keeps an explicit closed allowlist.
+**Let each feature mount an independent modal.** Rejected because independently true conditions could stack dialogs and compete for focus and app-root inert ownership.
 
 ## Consequences
 
-A fresh profile sees the current testing-stage notice, then the conditional DeepSeek key dialog when no provider is usable. Focused store and React tests pin exact-version acknowledgement, coordinator ordering, conditional transfer, shared modal behavior, and HMR cleanup. The real Chromium scenario boots the shipped Web composition with an isolated harness home, verifies both dialogs, writes the key through the existing credential boundary, and checks that no secret reaches the DOM, ARIA, or browser console.
+A fresh profile has no welcome declaration. When no provider is usable and the official DeepSeek credential can be written, the credential dialog is the first and only shipped onboarding step; ready or unrepairable deployments render no onboarding chrome. Existing welcome acknowledgement data remains parseable but inert. Focused registration and React tests pin coordinator ordering, conditional transfer, visible-only modal behavior, and HMR cleanup, while the real Chromium scenario asserts the notice is absent and the credential write remains secret-safe.

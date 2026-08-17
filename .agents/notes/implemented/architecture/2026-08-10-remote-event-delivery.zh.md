@@ -121,7 +121,7 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 
 由此得到一条对本设计要紧的连带纪律：**这些测试从客户端包 import 值或类型，会把该包的整个 project——以及它引用的每个 project——拖进 Host 构建图**。`ui-settings-general`/`ui-settings-models`/`ui-permission`/`ui-commands` 四个消费者 references `api/remotes` 的 client face，而该 face 必须等 host tsdown 生成 `@deepseek-ai/dsh-goal/remote` 才能编译，于是形成构建期死锁：host tsc → api/remotes client face → `goal/remote` → host tsdown → 排在 host tsc 之后。
 
-所需的客户端符号在测试侧**镜像**了一份（`scaffold.ts` 导出镜像后的 welcome-notice 常量，两个 chat e2e 直接引 `dsh-client-runtime/client` 因为 `runtime` 工程本来就在 host 图里），从而让那 4 个消费者离开了 host 图；`apps/cli/tsconfig.json` 里 15 条 client 工程引用随之失去 owner-map 职责，已一并删除。镜像值与源逐字一致，漂移的表现是选择器失配或通知未被抑制，都是响亮失败。
+这些测试仍需的客户端符号位于已有可达路径上：两个 chat e2e 直接引 `dsh-client-runtime/client`，因为 `runtime` 工程本来就在 Host 图里。所有 browser e2e 都不导入功能 client 包，因此这些消费方继续留在 Host 图之外；`apps/cli/tsconfig.json` 里 15 条 client 工程引用随之失去 owner-map 职责，已一并删除。
 
 ### 改动清单
 
@@ -137,7 +137,7 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 | `client/runtime` | 五条 Client 事件桥分支收敛为 `ctx.remote.$dispatch(frame.event, frame.args)`，并删除重复声明 |
 | 5 个消费者 | ui-commands / ui-settings-models / ui-settings-general / ui-permission / ui-agent-preset 改订 `ctx.remote.$on(...)`；照 `ui-goal` 先例 type-only 引 `@deepseek-ai/dsh-api-remotes/client` 并把 `'remote'` 加进 `inject` |
 | `client/connection` | fixture 的 `emitHost` 造 `host/remote-event` |
-| `apps/web/tests` + `apps/cli` | 客户端符号镜像（见上节）；`apps/cli/tsconfig.json` 删 15 条 client 工程引用 |
+| `apps/web/tests` + `apps/cli` | Browser e2e 避免功能 client 包 import；`apps/cli/tsconfig.json` 删 15 条 client 工程引用 |
 
 ## 备选方案
 
@@ -151,7 +151,7 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 
 **把 apps/web 的 browser e2e 搬进 client 聚合**。看似「客户端测试归客户端面」，实测立刻 21 条错：它们用 host 服务，而 client 程序里 `ctx.sessions` 是 `ISessions`。已否。
 
-**给 `directory-picker-browse`/`-native` 做 host/client 双 face 切分**，从根上让客户端包不进 host 图。方向正确（它们确实是未切分的双半包），但改动落在别人属地，而收益只是「构建图更干净」——本设计在测试侧镜像客户端符号之后已经不需要它。**已评估不做**。
+**给 `directory-picker-browse`/`-native` 做 host/client 双 face 切分**，从根上让客户端包不进 host 图。方向正确（它们确实是未切分的双半包），但改动落在别人属地，而收益只是「构建图更干净」。Browser e2e 避免导入功能 client 包，两个 runtime import 则已可经 Host 图解析，因此本设计不需要该拆分。**已评估不做**。
 
 ## 验证
 
@@ -171,7 +171,7 @@ zod 侧 `args: z.array(z.unknown())`：帧本身来自 `JSON.parse`，元素必�
 - **两个文件打破了 api/remotes 的 face 互斥约定**：`src/remote-events.ts` 与 `src/types.ts` 同属两个工程，各自向共享的 `lib/types` 发射一份相同声明。内容逐字节相同、`.tsbuildinfo` 各自独立，实践上无害；README 的构建边界节陈述了这个例外及其成因（`paths` 指向源码面）。
 - **载体交接是开发者可见的**：任何持有 `ctx.remote` 的 client 插件都能调 `$dispatch` 合成一条转发事件。这个暴露面早于该动词存在——先前由内部事件中转帧时，`ctx.emit` 同样可达——与 `connection/reset` 可被伪造成重连同一量级（client 是单一信任域）。测试只钉「交接到 `$on` 的转换」，不假装该端口鉴别调用方。
 - **畸形实参在发射方的收容里失败，而非加载期**：`assertJsonArgs` 在转发监听内抛出，因此由发射 seam 自己的 listener 收容记录并丢弃该帧——响亮地出现在 host 日志里，而不是加载时或 emit 点。
-- **测试侧镜像值可能漂移**：没有任何机制核对 `apps/web/tests` 中镜像的 client 常量与其源；安全网只是漂移会让选择器失配。规则写在 `apps/web/tests/README.md`，由 review 守；grep 级门禁经评估后刻意不做。
+- **未来的测试镜像仍由 review 负责**：Browser e2e 当前不镜像任何功能 client 值。若将来某个场景确有需要，`apps/web/tests/README.md` 要求紧邻一条注释掉的来源 import；当前语料没有可比对值，因此没有门禁机械核对。
 - **放弃的能力**：不支持投影或脱敏载荷、不支持 Scope 化事件（`agentCtx.remote.$on`）、重连不重放——这些都是纯失效信号，且 `connection/reset` 已覆盖重连后的重新拉取。mux 流的会话事件、可应答帧与快照基线不在范围内。
 - **仍有 client 包留在 host 图里**：12 个工程（`connection`、`runtime`、`ui-slots` 等）经未拆分的 `directory-picker-browse`/`-native` 与 `api/gateway → client/connection` 仍可达 host 图。它们都能编译且不再牵连 api/remotes 的 client face，因此没有阻塞本次改动；拆分那些包能减少几个，但经评估后不做。两个 chat e2e 直接引 `dsh-client-runtime/client` 依赖 `runtime` 本来就在图里——属偶然而非保证。
 - **invariant companion 不做运行期检查**：早先的修订曾在活事件总线上断言投递形状（`thisArg === null`、`mode === 'emit'`），这让 companion 与名单值耦合，并使 rolldown 把它提成第三个 bundle chunk——而机械推导的发布文件清单并不携带它。host 面的 `TypertForwardableEvent` 断言在编译期已拒绝这两种偏离，因此该 companion 是一个带说明的空 installer。

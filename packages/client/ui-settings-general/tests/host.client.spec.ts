@@ -15,7 +15,7 @@ class MemorySettings extends SettingsProvider {
 }
 
 describe('ui-settings-general host', () => {
-  it('registers and disposes the durable onboarding namespace with its fiber', async () => {
+  it('registers and disposes the legacy onboarding namespace with its fiber', async () => {
     const ctx = new Context()
     await ctx.plugin(MemorySettings).await()
     const fiber = ctx.plugin({ apply })

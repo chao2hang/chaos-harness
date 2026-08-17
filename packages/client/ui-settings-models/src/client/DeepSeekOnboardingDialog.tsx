@@ -3,7 +3,7 @@
  * provider/settings/credential join as the Models page: any provider the user
  * can already talk to ends the step, and only a user with none is offered the
  * official DeepSeek route. The step reuses that page's credential editor in
- * the onboarding plugin's shared modal, so the key is entered once.
+ * its onboarding modal, so the key is entered once.
  */
 
 import { useEffect } from 'react'

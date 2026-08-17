@@ -10,7 +10,7 @@ Every GUI first launch opened with a full-viewport internal-test statement (å†…æ
 
 ## Decision
 
-This decision removed the first-run notice from the assembled product rather than rewording it. `ui-settings-general` seated no `settings.onboarding` step; the notice component, acknowledgement store, copy owner, and locale keys were deleted, while the Host kept the `ui-onboarding` namespace so stored documents remained valid. The later [shared-modal product onboarding](../feature/2026-08-13-shared-modal-product-onboarding.md) restores a new concise testing-stage notice in `ui-settings-models`, reusing that field and backend contract without restoring the removed takeover layout or telemetry instructions. Telemetry opt-in remains an explicit deployment environment choice documented in the [CLI reference README](../../../../apps/cli/reference/README.md); the restored notice says nothing about enabling it.
+The assembled product contains no first-run internal-test statement. Neither `ui-settings-general` nor `ui-settings-models` registers a welcome step; the notice component, acknowledgement store, copy owner, locale keys, and browser scenarios are absent. The Host retains the `ui-onboarding.welcomeNoticeVersion` schema solely so existing settings documents remain valid, while API Proxy and browser plugins do not expose or consume it. The [internal-testing dialog removal](2026-08-17-remove-internal-testing-dialog.md) owns removal of the later shared-modal restoration. Telemetry opt-in remains an explicit deployment environment choice documented in the [CLI reference README](../../../../apps/cli/reference/README.md).
 
 ## Alternatives considered
 
@@ -22,4 +22,4 @@ This decision removed the first-run notice from the assembled product rather tha
 
 ## Consequences
 
-This removal eliminated the full-viewport notice and its telemetry copy. The later restoration is intentionally a different presentation and copy revision: a shared modal precedes the inline credential dialog, the remote scenario again covers process-local acknowledgement, and the existing `welcomeNoticeVersion` field records the new copy version. The historical telemetry prompt remains absent.
+No first-run statement or telemetry prompt blocks the GUI. The conditional credential dialog remains because it repairs a missing provider credential, and the historical `welcomeNoticeVersion` field remains inert compatibility data rather than a completion mechanism.
