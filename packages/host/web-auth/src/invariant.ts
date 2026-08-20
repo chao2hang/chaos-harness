@@ -10,9 +10,11 @@ export const name = 'host-web-auth-invariant'
 export const inject = ['invariants']
 
 /**
- * The authentication plugin owns only route and guard registrations, whose
- * disposal is mechanically covered by WebServer's registry invariant. It has
- * no durable state or independently observable relationship to assert.
+ * No runtime invariant: the authentication plugin owns only route and guard
+ * registrations, whose disposal is mechanically covered by WebServer's
+ * registry invariant. Its in-memory session map is validated per request
+ * (idle and absolute deadlines checked on every authenticated access) rather
+ * than asserted as an independent observable relationship.
  */
 const install: InvariantInstaller = (_ctx, _fail) => {}
 
