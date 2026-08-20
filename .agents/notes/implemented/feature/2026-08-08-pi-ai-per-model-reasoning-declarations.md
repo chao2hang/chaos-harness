@@ -27,7 +27,8 @@ Two adjacent gaps compounded this. pi-ai decides the reasoning *wire dialect* (`
 
 ## Consequences
 
-- The composer's effort pane works for hand-declared models with zero UI change — `resolveModelInfo` reports declared levels through the same seam catalog metadata uses (pinned by the `declared-reasoning` web scenario).
-- #1860's deferred gap — a route-level effort a model cannot take failing its requests — now has an operator remedy: align the model's `reasoningEfforts` or drop the route default.
+- The Models card exposes curated standard and DeepSeek per-model declarations. A newly added custom model starts with the standard declaration, while the operator can mark it non-adjustable or narrow it to DeepSeek's `off`/`high`/`max` set before saving. `resolveModelInfo` reports the resulting levels through the same catalog metadata used by the composer's effort pane.
+- The composer renders the fixed `off` through `max` escalation as a range control, marks unsupported positions unavailable, and snaps attempts at an unavailable position to the closest lower supported level. Switching models likewise preserves an explicit effort when the target supports it, otherwise selects the closest lower shared level and announces the adjustment. A target with no reasoning metadata clears the explicit effort and uses its provider default. The host still rejects unsupported explicit ids before provider I/O; it never guesses from flattened provider error text or retries a failed request under another level.
+- #1860's deferred gap — a route-level effort a model cannot take failing its requests — has an operator remedy: align the model's `reasoningEfforts` or drop the route default.
 - There is deliberately no spelling for returning one map key or compat field to "whatever the catalog said": the declaration is the whole offer, so keeping a catalog value means restating it. The README documents this.
 - `verify-package-invariants` is untouched: the feature adds configuration resolution, no new events or mutable runtime relations.
