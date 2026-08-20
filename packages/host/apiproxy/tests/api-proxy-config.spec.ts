@@ -404,7 +404,7 @@ describe('settings domain', () => {
       .toEqual({ secretPath: '/etc/shadow' })
   })
 
-  it('serves browser preferences without exposing the legacy onboarding namespace', async () => {
+  it('serves product preference namespaces without invalidating the model catalog', async () => {
     const ctx = await harness()
     ctx.settings.register(settingsNamespace('ui-onboarding'), z.object({ welcomeNoticeVersion: z.string() }))
     ctx.settings.register(settingsNamespace('ui-theme'), z.object({
@@ -412,20 +412,18 @@ describe('settings domain', () => {
     }))
     const api = createApiProxy(ctx, DEFAULTS)
     expect(expectOk(await api.settings.describe(request({}))).namespaces.map(view => view.ns))
-      .toEqual(['ui-theme'])
-    const onboarding = expectErr(await api.settings.mutate(request({
-      ns: 'ui-onboarding',
-      ops: [{ op: 'set', path: ['welcomeNoticeVersion'], value: 'v1' }],
-    })))
-    expect(onboarding.code).toBe('settings-not-exposed')
-    expect(onboarding.details).toEqual({ ns: 'ui-onboarding' })
-    const frames = await collectHost(api, ['host/remote-event'], 1, async () => {
+      .toEqual(['ui-onboarding', 'ui-theme'])
+    const frames = await collectHost(api, ['host/remote-event'], 2, async () => {
+      expectOk(await api.settings.mutate(request({
+        ns: 'ui-onboarding',
+        ops: [{ op: 'set', path: ['welcomeNoticeVersion'], value: 'v1' }],
+      })))
       expectOk(await api.settings.mutate(request({
         ns: 'ui-theme',
         ops: [{ op: 'set', path: ['preference'], value: 'dark' }],
       })))
     })
-    expect(frames).toEqual([forwardedSettings('ui-theme')])
+    expect(frames).toEqual([forwardedSettings('ui-onboarding'), forwardedSettings('ui-theme')])
   })
 
   it('serves the agent-preset namespace, so a browser preset picker can persist its choice', async () => {

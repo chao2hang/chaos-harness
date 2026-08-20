@@ -158,7 +158,7 @@ describe('web command-line provider', () => {
       '--host', '0.0.0.0', '--auth', 'required', '--public-url', 'https://dsh.example.test',
     ])
     expect(accepted.values).toEqual({
-      auth: 'required', host: '0.0.0.0', publicUrl: 'https://dsh.example.test', trustedHosts: [],
+      auth: 'required', host: '0.0.0.0', openBrowser: true, publicUrl: 'https://dsh.example.test', trustedHosts: [],
     })
     expect(accepted.observed.exits).toEqual([])
   })

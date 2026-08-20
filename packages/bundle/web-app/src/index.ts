@@ -160,9 +160,9 @@ function webSurfacePrompt(webUrl: string): string {
 /** Resolve the canonical URL from the active Web server or reverse-proxy configuration. */
 function localWebUrl(ctx: Context, publicUrl: string | undefined): string {
   if (publicUrl !== undefined) return publicUrl
-  const server = ctx.get('webServer')
-  if (server === undefined) throw new Error('web-app: webServer service missing while resolving Web runtime')
-  return `${server.protocol}://${LOOPBACK_HOST}:${String(server.port)}`
+  const port = ctx.get('webServer')?.port
+  if (port === undefined) throw new Error('web-app: webServer service missing while resolving Web runtime')
+  return `${ctx.get('webServer')!.protocol}://${LOOPBACK_HOST}:${String(port)}`
 }
 
 /** Dist location is workspace knowledge of this bundle: resolved through the frontend package exports, not configured. */
