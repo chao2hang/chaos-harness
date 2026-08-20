@@ -41,14 +41,39 @@ export const WIDER_MODES: Record<string, readonly SandboxMode[]> = {
 export const ESCALATION_TARGETS: readonly SandboxMode[] = ['workspace-write', 'danger-full-access']
 
 /**
+ * Whether `requested` is a strictly wider target than `effective`. Unknown
+ * effective modes have no wider targets.
+ * @param requested - the `sandbox_permissions` value the call asked for.
+ * @param effective - the call's standing mode.
+ * @returns true only when the ask is on the strictly-wider ladder.
+ */
+export function isStrictlyWider(requested: string, effective: SandboxMode): boolean {
+  return (WIDER_MODES[effective] ?? []).includes(requested as SandboxMode)
+}
+
+/**
  * Validate the escalation argument pairing a tool schema cannot express:
  * `sandbox_permissions` and `justification` travel together — an approval
  * prompt without a reason, or a reason driving nothing, is a malformed ask —
- * and the justification must be a non-empty sentence.
+ * and the justification must be a non-empty sentence. A `sandbox_permissions`
+ * that is not strictly wider than `effectiveMode` is redundant and skipped
+ * (justification optional), so a cargo-culted field does not fail the call.
  * @param sandboxPermissions - the raw `sandbox_permissions` argument, if given.
  * @param justification - the raw `justification` argument, if given.
+ * @param effectiveMode - the call's standing mode, when already resolved.
  */
-export function validateEscalationArgs(sandboxPermissions: string | undefined, justification: string | undefined): void {
+export function validateEscalationArgs(
+  sandboxPermissions: string | undefined,
+  justification: string | undefined,
+  effectiveMode?: SandboxMode,
+): void {
+  if (
+    sandboxPermissions !== undefined
+    && effectiveMode !== undefined
+    && !isStrictlyWider(sandboxPermissions, effectiveMode)
+  ) {
+    return
+  }
   if (sandboxPermissions !== undefined && justification === undefined) {
     throw new Error('invalid escalation: sandbox_permissions requires a justification')
   }
@@ -145,23 +170,26 @@ export interface EscalationRequest {
  * widening against the call's effective mode, then resolve the approval
  * channel, then map every outcome — the ordered fail-closed sequence both
  * enforcing families share. Returns the granted mode to stamp onto exactly
- * this call; throws the distinct verbatim text for every other path (a
- * non-widening request, a missing approval service, an agent-less execution,
- * a rejection, a cancellation, an unanswerable ask) — the tool registry turns
- * the throw into the call's isError result, and nothing has run. A
- * non-widening request never prompts a human.
+ * this call, or `undefined` when the request is not strictly wider (the
+ * caller keeps the standing policy and does not prompt). Throws the distinct
+ * verbatim text for every other path (a missing approval service, an
+ * agent-less execution, a rejection, a cancellation, an unanswerable ask) —
+ * the tool registry turns the throw into the call's isError result, and
+ * nothing has run. A non-widening request never prompts a human.
  * @param request - the escalation to judge (see {@link EscalationRequest}).
  * @param approval - the approval ingredients the tool holds (see {@link EscalationApproval}).
- * @returns the granted mode, consumed by the one call that asked.
+ * @returns the granted mode, or `undefined` when the ask is redundant.
  */
-export async function approveEscalation<A, C>(request: EscalationRequest, approval: EscalationApproval<A, C>): Promise<SandboxMode> {
+export async function approveEscalation<A, C>(
+  request: EscalationRequest,
+  approval: EscalationApproval<A, C>,
+): Promise<SandboxMode | undefined> {
   const { requestedMode: mode, effectiveMode, justification, subject } = request
   // Strict widening is an EXECUTION check against the call's effective mode —
   // deliberately not a schema constraint (the enum is the closed target
-  // vocabulary; the effective mode is per-call truth).
-  if (!(WIDER_MODES[effectiveMode] ?? []).includes(mode as SandboxMode)) {
-    throw new Error(`sandbox escalation to "${mode}" is not strictly wider than this call's current "${effectiveMode}" mode`)
-  }
+  // vocabulary; the effective mode is per-call truth). A non-widening ask is
+  // cargo-cult residue, not a grant: ignore it and keep the standing mode.
+  if (!isStrictlyWider(mode, effectiveMode)) return undefined
   if (approval.approver === undefined) {
     throw new Error(`sandbox escalation to "${mode}" requires approval, but no approval service is composed`)
   }

@@ -12,6 +12,7 @@ import {
   WIDER_MODES,
   approveEscalation,
   escalationHintMarker,
+  isStrictlyWider,
   sandboxDenialMarker,
   validateEscalationArgs,
 } from '@deepseek-ai/dsh-sandbox'
@@ -22,6 +23,10 @@ describe('the strictly-wider ladder', () => {
     expect(WIDER_MODES['read-only']).toEqual(['workspace-write', 'danger-full-access'])
     expect(WIDER_MODES['workspace-write']).toEqual(['danger-full-access'])
     expect(WIDER_MODES['danger-full-access']).toBeUndefined()
+    expect(isStrictlyWider('workspace-write', 'read-only')).toBe(true)
+    expect(isStrictlyWider('workspace-write', 'workspace-write')).toBe(false)
+    expect(isStrictlyWider('workspace-write', 'danger-full-access')).toBe(false)
+    expect(isStrictlyWider('danger-full-access', 'danger-full-access')).toBe(false)
   })
 
   it('the target enum is the closed set every session could escalate TO (read-only is the floor)', () => {
@@ -39,6 +44,14 @@ describe('validateEscalationArgs', () => {
     expect(() => { validateEscalationArgs('workspace-write', undefined) }).toThrow(/requires a justification/)
     expect(() => { validateEscalationArgs(undefined, 'orphan reason') }).toThrow(/only valid together with sandbox_permissions/)
     expect(() => { validateEscalationArgs('workspace-write', '   ') }).toThrow(/non-empty sentence/)
+  })
+
+  it('skips pairing when sandbox_permissions is not strictly wider than the standing mode', () => {
+    expect(() => { validateEscalationArgs('workspace-write', undefined, 'workspace-write') }).not.toThrow()
+    expect(() => { validateEscalationArgs('workspace-write', undefined, 'danger-full-access') }).not.toThrow()
+    expect(() => { validateEscalationArgs('workspace-write', '   ', 'danger-full-access') }).not.toThrow()
+    expect(() => { validateEscalationArgs(undefined, 'orphan reason', 'danger-full-access') }).toThrow(/only valid together with sandbox_permissions/)
+    expect(() => { validateEscalationArgs('workspace-write', undefined, 'read-only') }).toThrow(/requires a justification/)
   })
 })
 
@@ -81,13 +94,12 @@ describe('approveEscalation', () => {
     expect(seen[0]?.reason).toBe('escalate sandbox to workspace-write: the user asked to write in the workspace')
   })
 
-  it('a non-widening request fails closed with its own text and never asks', async () => {
+  it('a non-widening request is ignored and never asks', async () => {
     const seen: unknown[] = []
     const spy = ingredients({ approver: approver('allowed-once', r => seen.push(r)) })
-    await expect(approveEscalation(req({ requestedMode: 'read-only' }), spy))
-      .rejects.toThrow(/not strictly wider than this call's current "read-only" mode/)
-    await expect(approveEscalation(req({ requestedMode: 'workspace-write', effectiveMode: 'danger-full-access' as never }), spy))
-      .rejects.toThrow(/not strictly wider/)
+    await expect(approveEscalation(req({ requestedMode: 'read-only' }), spy)).resolves.toBeUndefined()
+    await expect(approveEscalation(req({ requestedMode: 'workspace-write', effectiveMode: 'danger-full-access' }), spy))
+      .resolves.toBeUndefined()
     expect(seen).toEqual([])
   })
 

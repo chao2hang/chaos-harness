@@ -13,7 +13,10 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandbox'
-import { ESCALATION_TARGETS, approveEscalation, escalationHintMarker, sandboxDenialMarker, validateEscalationArgs } from '@deepseek-ai/dsh-sandbox'
+import {
+  ESCALATION_TARGETS, approveEscalation, escalationHintMarker, isStrictlyWider,
+  sandboxDenialMarker, validateEscalationArgs,
+} from '@deepseek-ai/dsh-sandbox'
 import type { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import { FsError } from '@deepseek-ai/dsh-fs'
 
@@ -85,13 +88,17 @@ export class FsSandboxController {
    *   unsandboxed backend.
    */
   async resolvePolicy(toolName: string, args: FsEscalationArgs, exec: ToolExecution): Promise<SandboxExecutionPolicy | undefined> {
-    validateEscalationArgs(args.sandbox_permissions, args.justification)
     const standingPolicy = this.policy?.resolve({ ...exec.agent ? { session: exec.agent.session } : {} })
-    if (args.sandbox_permissions === undefined || args.justification === undefined) {
-      return standingPolicy
-    }
-    if (this.escalationModes.length === 0) {
+    validateEscalationArgs(args.sandbox_permissions, args.justification, standingPolicy?.mode)
+    if (args.sandbox_permissions !== undefined && this.escalationModes.length === 0) {
       throw new Error('sandbox_permissions is not available in this composition (no sandboxing filesystem to escalate)')
+    }
+    if (
+      args.sandbox_permissions === undefined
+      || args.justification === undefined
+      || (standingPolicy !== undefined && !isStrictlyWider(args.sandbox_permissions, standingPolicy.mode))
+    ) {
+      return standingPolicy
     }
     const policy = standingPolicy as SandboxExecutionPolicy
     const approvedMode = await approveEscalation(
@@ -104,7 +111,7 @@ export class FsSandboxController {
         signal: exec.signal,
       },
     )
-    return { ...policy, mode: approvedMode }
+    return approvedMode === undefined ? policy : { ...policy, mode: approvedMode }
   }
 
   /**
