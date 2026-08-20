@@ -22,6 +22,7 @@ const CONNECTED: HostDescription = {
   version: '1.2.3',
   cwd: '/srv/project',
   attachedSessions: 2,
+  home: '/home',
   canOpenPath: true,
   canRestart: true,
 }

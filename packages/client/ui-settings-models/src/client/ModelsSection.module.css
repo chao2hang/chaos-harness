@@ -518,45 +518,6 @@
   line-height: 18px;
 }
 
-.modelFieldHint {
-  color: var(--dsw-alias-label-dimmed);
-  font-size: 11px;
-  line-height: 16px;
-}
-
-.modelCapability {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.modelCapability input {
-  margin-top: 3px;
-}
-
-.modelCapability span {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.modelCapability strong {
-  color: var(--dsw-alias-label-primary);
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 500;
-}
-
-.modelCapability small {
-  color: var(--dsw-alias-label-dimmed);
-  font-size: 11px;
-  line-height: 16px;
-}
-
 .modelEmpty {
   padding: 12px;
   border: 1px dashed var(--dsw-alias-border-l3);

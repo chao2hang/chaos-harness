@@ -143,49 +143,10 @@ function capacitySpelling(value: number | undefined): string {
   return value === undefined ? '' : formatCapacity(value)
 }
 
-const STANDARD_REASONING_EFFORTS = {
-  off: null,
-  minimal: 'minimal',
-  low: 'low',
-  medium: 'medium',
-  high: 'high',
-  xhigh: 'xhigh',
-  max: 'max',
-} as const
-
-const DEEPSEEK_REASONING_EFFORTS = {
-  off: null,
-  high: 'high',
-  max: 'max',
-} as const
-
-type ReasoningPreset = 'none' | 'standard' | 'deepseek'
-
-/** New hand-declared models start permissive; the user can narrow either claim before saving. */
-function newModel(id = ''): ModelDraft {
-  return {
-    id,
-    input: ['text', 'image'],
-    reasoningEfforts: { ...STANDARD_REASONING_EFFORTS },
-  }
-}
-
-/** Identify which curated reasoning declaration the row currently carries. */
-function reasoningPreset(model: ModelDraft): ReasoningPreset {
-  const value = model.reasoningEfforts
-  if (value === false || value === undefined) return 'none'
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return 'none'
-  const entries = Object.entries(value)
-  const same = (preset: Readonly<Record<string, string | null>>): boolean =>
-    entries.length === Object.keys(preset).length
-    && entries.every(([key, wire]) => preset[key] === wire)
-  return same(DEEPSEEK_REASONING_EFFORTS) ? 'deepseek' : 'standard'
-}
-
-/** Adopt a candidate, keeping disclosed capacities and applying editable custom-model defaults. */
+/** Adopt a candidate, keeping whatever capacities the provider disclosed. */
 function adopt(candidate: DiscoveredModelView): ModelDraft {
   return {
-    ...newModel(candidate.id),
+    id: candidate.id,
     ...candidate.name === undefined ? {} : { name: candidate.name },
     ...candidate.contextWindow === undefined ? {} : { contextWindow: candidate.contextWindow },
     ...candidate.maxTokens === undefined ? {} : { maxTokens: candidate.maxTokens },
@@ -249,7 +210,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
     })
   }
 
-  const patch = (index: number, next: Record<string, unknown>): void => {
+  const patch = (index: number, next: Record<string, string | number | undefined>): void => {
     onChange(models.map((model, at) => {
       if (at !== index) return model
       // Rebuilt rather than spread over: an emptied optional field has to leave
@@ -442,59 +403,31 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
           {expanded.has(index)
             ? (
               <div className={styles['modelAdvanced']}>
-                {(['contextWindow', 'maxTokens'] as const).map(field => (
-                  <label className={styles['modelField']} key={field}>
-                    <span className={styles['modelFieldLabel']}>
-                      {field === 'contextWindow' ? t('modelContextWindow') : t('modelMaxTokens')}
-                    </span>
-                    <input
-                      className={styles['input']}
-                      type="text"
-                      inputMode="numeric"
-                      value={capacityText(model, index, field)}
-                      placeholder={CAPACITY_HINT[field]}
-                      aria-label={`${field === 'contextWindow' ? t('modelContextWindow') : t('modelMaxTokens')} ${index + 1}`}
-                      disabled={disabled}
-                      onChange={(event) => { editCapacity(index, field, event.target.value) }}
-                    />
-                  </label>
-                ))}
-                <label className={styles['modelCapability']}>
+                <label className={styles['modelField']}>
+                  <span className={styles['modelFieldLabel']}>{t('modelContextWindow')}</span>
                   <input
-                    type="checkbox"
-                    checked={Array.isArray(model.input) && model.input.includes('image')}
-                    aria-label={`${t('modelImageInput')} ${index + 1}`}
+                    className={styles['input']}
+                    type="text"
+                    inputMode="numeric"
+                    value={capacityText(model, index, 'contextWindow')}
+                    placeholder={CAPACITY_HINT.contextWindow}
+                    aria-label={`${t('modelContextWindow')} ${index + 1}`}
                     disabled={disabled}
-                    onChange={(event) => { patch(index, { input: event.target.checked ? ['text', 'image'] : ['text'] }) }}
+                    onChange={(event) => { editCapacity(index, 'contextWindow', event.target.value) }}
                   />
-                  <span>
-                    <strong>{t('modelImageInput')}</strong>
-                    <small>{t('modelImageInputHint')}</small>
-                  </span>
                 </label>
                 <label className={styles['modelField']}>
-                  <span className={styles['modelFieldLabel']}>{t('modelReasoning')}</span>
-                  <select
-                    className={`${styles['input']} ${styles['selectInput']}`}
-                    value={reasoningPreset(model)}
-                    aria-label={`${t('modelReasoning')} ${index + 1}`}
+                  <span className={styles['modelFieldLabel']}>{t('modelMaxTokens')}</span>
+                  <input
+                    className={styles['input']}
+                    type="text"
+                    inputMode="numeric"
+                    value={capacityText(model, index, 'maxTokens')}
+                    placeholder={CAPACITY_HINT.maxTokens}
+                    aria-label={`${t('modelMaxTokens')} ${index + 1}`}
                     disabled={disabled}
-                    onChange={(event) => {
-                      const preset = event.target.value as ReasoningPreset
-                      patch(index, {
-                        reasoningEfforts: preset === 'none'
-                          ? false
-                          : preset === 'deepseek'
-                            ? { ...DEEPSEEK_REASONING_EFFORTS }
-                            : { ...STANDARD_REASONING_EFFORTS },
-                      })
-                    }}
-                  >
-                    <option value="none">{t('modelReasoningNone')}</option>
-                    <option value="standard">{t('modelReasoningStandard')}</option>
-                    <option value="deepseek">{t('modelReasoningDeepSeek')}</option>
-                  </select>
-                  <small className={styles['modelFieldHint']}>{t('modelReasoningHint')}</small>
+                    onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
+                  />
                 </label>
               </div>
             )
@@ -505,7 +438,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
         type="button"
         className={styles['addModelButton']}
         disabled={disabled}
-        onClick={() => { onChange([...models, newModel()]) }}
+        onClick={() => { onChange([...models, { id: '' }]) }}
       >
         {t('addModel')}
       </button>
