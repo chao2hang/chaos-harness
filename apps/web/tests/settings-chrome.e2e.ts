@@ -129,6 +129,55 @@ describe('web e2e: settings modal and General preferences', () => {
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
+  it('reports this deployment as unable to restart itself and offers no dead control', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-maintenance'))
+    const trigger = page.getByRole('button', { name: '设置', exact: true })
+    await trigger.click()
+    const dialog = page.getByRole('dialog', { name: '设置' })
+    await dialog.waitFor({ timeout: 10_000 })
+    await dialog.getByRole('button', { name: '系统维护' }).click()
+    await dialog.getByRole('heading', { name: '系统维护' }).waitFor({ timeout: 10_000 })
+
+    // Status comes from the same host.describe the connection already holds,
+    // so the section reports the scaffold's real working directory.
+    await expect.poll(
+      () => dialog.getByText(scaffold.workspaceCwd, { exact: true }).count(),
+      { timeout: 10_000 },
+    ).toBe(1)
+
+    // This scaffold boots the tree directly rather than through the dsh
+    // launcher, so nothing provides `appRestart`. That is the honest
+    // unavailable state: the reason is stated and the button stays inert.
+    await dialog.getByText('当前部署无法自行重启：启动它的方式没有提供重启入口。').waitFor({ timeout: 10_000 })
+    expect(await dialog.getByRole('button', { name: '重启服务' }).isEnabled()).toBe(false)
+
+    await page.keyboard.press('Escape')
+    await expect.poll(() => page.getByRole('dialog', { name: '设置' }).count(), { timeout: 5_000 }).toBe(0)
+    expect(tripwire.pageErrors).toEqual([])
+  }, 60_000)
+
+  it('keeps settings interactive above the mobile sidebar drawer', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-mobile-drawer'))
+    await page.setViewportSize({ width: 480, height: 800 })
+    const openDrawer = page.getByRole('button', { name: '打开侧边栏' })
+    await openDrawer.waitFor({ timeout: 10_000 })
+    await openDrawer.click()
+    await page.getByRole('button', { name: '设置', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '设置' })
+    await dialog.waitFor({ timeout: 10_000 })
+    const isolation = await page.locator('[class*="frame"]').evaluate(element => getComputedStyle(element).isolation)
+    expect(isolation).toBe('isolate')
+    await dialog.getByRole('button', { name: '模型' }).click()
+    await expect.poll(
+      () => dialog.getByRole('button', { name: '模型' }).getAttribute('aria-current'),
+      { timeout: 5_000 },
+    ).toBe('true')
+    await page.keyboard.press('Escape')
+    await expect.poll(() => page.getByRole('dialog', { name: '设置' }).count(), { timeout: 5_000 }).toBe(0)
+    await page.locator('[class*="drawerScrim"][data-open]').click({ position: { x: 400, y: 400 } })
+    await page.setViewportSize({ width: 1680, height: 1000 })
+  }, 60_000)
+
   it('stores Permission as the default for future sessions without changing an existing session', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-settings-permission'))
     const existing = scaffold.ctx.sessions.create(SessionId('settings-permission-before'))

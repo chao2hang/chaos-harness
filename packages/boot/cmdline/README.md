@@ -10,8 +10,11 @@ A launcher calls `provideCmdline(ctx, host)` before any tree entry mounts, which
 
 - `ctx.cmdlineArgs` — the invocation's inner arguments. `get()` is the whole interface, and it returns a snapshot: `dsh --profile tui --resume abc` yields `['--resume', 'abc']`.
 - `ctx.appExit` — a bounded process-exit request, wired to the launcher's shutdown controller.
+- `ctx.appRestart` — a bounded process-replacement request: dispose the tree, then boot a successor from the identical command line.
 
 An embedding host with no command line provides an empty list; that is the honest answer, not a missing value.
+
+`restart` is the one optional member, because a launcher that cannot start a successor has no honest implementation to give: an embedded host, or a surface whose lifetime a supervisor owns. It then omits `restart`, `ctx.appRestart` stays absent, and a consumer reports the capability as unavailable. Substituting a plain exit there would stop the server with nothing to replace it.
 
 ## Ordinary providers and injected config
 

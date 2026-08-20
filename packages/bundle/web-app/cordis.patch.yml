@@ -173,7 +173,7 @@
     # webserver under /api; browser half is the fetch/SSE client.
     - id: connection
       name: '@deepseek-ai/dsh-client-connection'
-      inject: [webRuntime]
+      inject: [webRuntime, webAuth]
       config:
         # LAN literals, the configured reverse-proxy authority, and
         # --trusted-host extras derived from the active deployment.
@@ -211,6 +211,9 @@
 
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
+
+    - id: ui-settings-maintenance
+      name: '@deepseek-ai/dsh-client-ui-settings-maintenance'
 
     - id: ui-conversation
       name: '@deepseek-ai/dsh-client-ui-conversation'

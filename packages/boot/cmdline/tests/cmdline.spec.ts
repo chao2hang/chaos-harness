@@ -229,4 +229,20 @@ describe('provideCmdline', () => {
     expect(parseOnce()).toEqual({ port: 8080 })
     expect(Object.isFrozen(ctx.cmdlineArgs?.get())).toBe(true)
   })
+
+  it('provides the restart request only for a launcher that can start a successor', () => {
+    const withRestart = new Context()
+    const restarts: true[] = []
+    provideCmdline(withRestart, { args: [], exit: () => {}, restart: () => void restarts.push(true) })
+    withRestart.appRestart?.()
+    expect(restarts).toEqual([true])
+
+    // A launcher that cannot replace its process leaves the value absent, so a
+    // consumer reports the capability as unavailable instead of substituting a
+    // plain exit that would stop the app with nothing to take over.
+    const withoutRestart = new Context()
+    provideCmdline(withoutRestart, { args: [], exit: () => {} })
+    expect(withoutRestart.get('appRestart')).toBeUndefined()
+    expect(withoutRestart.get('appExit')).toBeDefined()
+  })
 })

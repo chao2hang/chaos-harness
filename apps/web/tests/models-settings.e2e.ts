@@ -6,10 +6,11 @@
 // appears after route topology invalidation without presenting liveness as
 // provider status. The customized-settings fold writes its curated fields —
 // the endpoint, and a declared route's own name and protocol — as merge
-// patches against the stored profile. Zero model calls: configuration is pure
-// settings/credentials/llm-domain traffic, so there is no fixture and a
-// stray stream would fail loud because the adapter registry is empty. The provider under test is
-// minimax-cn so a developer's real ANTHROPIC/OPENAI environment keys can
+// patches against the stored profile. The model-discovery regression intercepts
+// one deterministic provider response; all other provider traffic remains
+// configuration-only, and a stray stream fails loud because the adapter registry
+// is empty. The provider under test is minimax-cn, so a developer's real
+// ANTHROPIC/OPENAI environment keys can
 // never shadow the derived reference. The deletion dialog distinguishes a
 // reference-free profile from a page-managed key before the credential and
 // settings unsets reach the wire.
@@ -115,6 +116,93 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     expect(document).not.toContain('MINIMAX_CN_API_KEY')
   }, 60_000)
 
+  it('shows fetched models in a mobile picker above the settings sheet', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-models-mobile-fetch'))
+    let discoveryRequests = 0
+    await page.route('**/api/llm.discoverModels', async route => {
+      const request = route.request().postDataJSON() as { rpcId: string }
+      discoveryRequests += 1
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          type: 'server-response',
+          rpcId: request.rpcId,
+          result: { ok: true, value: { models: [{ id: 'mobile-model' }] } },
+        }),
+      })
+    })
+    try {
+      const settingsDialog = page.getByRole('dialog', { name: '设置' })
+      await page.setViewportSize({ width: 480, height: 800 })
+      await settingsDialog.getByRole('button', { name: '编辑 minimax-cn' }).evaluate((button) => {
+        ;(button as HTMLButtonElement).click()
+      })
+      await page.waitForFunction(() => {
+        const details = document.querySelector('[role="dialog"] details')
+        if (!(details instanceof HTMLDetailsElement)) return false
+        details.open = true
+        return true
+      })
+      await page.waitForFunction(() => {
+        const dialog = document.querySelector('[role="dialog"]')
+        const fetch = [...(dialog?.querySelectorAll('button') ?? [])]
+          .find(button => button.textContent?.trim() === '获取可用模型')
+        return fetch instanceof HTMLButtonElement && !fetch.disabled
+      })
+      const discoveryResponse = page.waitForResponse('**/api/llm.discoverModels')
+      await page.evaluate(() => {
+        const dialog = document.querySelector('[role="dialog"]')
+        const fetch = [...(dialog?.querySelectorAll('button') ?? [])]
+          .find(button => button.textContent?.trim() === '获取可用模型')
+        if (!(fetch instanceof HTMLButtonElement)) throw new Error('model fetch button did not render')
+        fetch.click()
+      })
+      await (await discoveryResponse).finished()
+      expect(discoveryRequests).toBe(1)
+      await expect.poll(
+        () => page.locator('[role="dialog"]').allTextContents()
+          .then(dialogs => dialogs.some(text => text.includes('选择要添加的模型'))),
+        { timeout: 10_000 },
+      ).toBe(true)
+      await expect.poll(() => page.evaluate(() => {
+        const dialog = [...document.querySelectorAll('[role="dialog"]')]
+          .find(candidate => candidate.textContent?.includes('选择要添加的模型'))
+        if (!(dialog instanceof HTMLElement)) return undefined
+        const candidate = dialog.querySelector('ul li span')
+        const root = dialog.parentElement
+        return {
+          candidate: candidate?.textContent ?? '',
+          rootZIndex: root === null ? '' : getComputedStyle(root).zIndex,
+        }
+      }), { timeout: 10_000 }).toEqual({
+        candidate: 'mobile-model',
+        rootZIndex: '1050',
+      })
+      await page.evaluate(() => {
+        const dialog = [...document.querySelectorAll('[role="dialog"]')]
+          .find(candidate => candidate.textContent?.includes('选择要添加的模型'))
+        const close = dialog?.querySelector('button[aria-label="关闭"]')
+        if (!(close instanceof HTMLButtonElement)) throw new Error('model picker close button did not render')
+        close.click()
+      })
+      await expect.poll(
+        () => page.locator('[role="dialog"]').allTextContents()
+          .then(dialogs => dialogs.some(text => text.includes('选择要添加的模型'))),
+        { timeout: 5_000 },
+      ).toBe(false)
+      await page.evaluate(() => {
+        const dialog = document.querySelector('[role="dialog"]')
+        const cancel = [...(dialog?.querySelectorAll('button') ?? [])]
+          .find(button => button.textContent?.trim() === '取消')
+        if (cancel instanceof HTMLButtonElement) cancel.click()
+      })
+    } finally {
+      await page.unroute('**/api/llm.discoverModels')
+      await page.setViewportSize({ width: 1680, height: 1000 })
+    }
+  }, 60_000)
+
   it('describes reference-free deletion without claiming a credential exists', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-native-delete'))
     const settingsDialog = page.getByRole('dialog', { name: '设置' })
@@ -187,12 +275,11 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     await dialog.getByLabel('Provider ID').fill('acme-gateway')
     await dialog.getByLabel('显示名称').fill('Acme Gateway')
     await dialog.getByLabel('API 地址').fill('https://gateway.acme.example/v1')
-    // No reasoning effort on a provider card at all: effort is a per-model
-    // capability, the models under one provider disagree about it, and a
-    // switch in the composer already records provider+model+effort together.
-    expect(await dialog.getByLabel('推理强度').count()).toBe(0)
     await dialog.getByRole('button', { name: '添加模型' }).click()
     await dialog.getByLabel('模型 ID 1').fill('acme-large')
+    await dialog.getByLabel('能力与容量 1').click()
+    expect(await dialog.getByLabel('支持上传图片 1').isChecked()).toBe(true)
+    expect(await dialog.getByLabel('推理强度档位 1').inputValue()).toBe('standard')
     await dialog.getByRole('button', { name: '创建提供方', exact: true }).click()
 
     const row = dialog.getByText('Acme Gateway', { exact: true }).first()

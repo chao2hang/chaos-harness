@@ -124,6 +124,14 @@ export interface ModelCatalogModel {
   name: string
   /** Optional provider-supplied description. */
   description?: string
+  /** Accepted request modalities; absence means the adapter does not know. */
+  inputModalities?: string[]
+  /** Declared context capacity for this exact model route. */
+  contextWindow?: number
+  /** Configured output-token default for this exact model route. */
+  maxTokens?: number
+  /** Whether the model picker may persist capacity edits for this model. */
+  capabilitiesEditable?: true
   /** Exact-route reasoning metadata when the adapter exposes it. */
   reasoning?: ModelReasoning
 }
@@ -298,6 +306,10 @@ export interface SessionsApi {
     provider: string
     model: string
     reasoningEffort?: string
+    contextWindow?: number
+    maxTokens?: number
+    imageInput?: boolean
+    enableReasoning?: true
   }>):
   Promise<RpcResponse<{ selected: ModelSelection }>>
 

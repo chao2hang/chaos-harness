@@ -18,6 +18,7 @@ export const hostDescribeValueSchema = z.object({
   model: z.string().optional(),
   attachedSessions: z.number().int().nonnegative(),
   canOpenPath: z.boolean(),
+  canRestart: z.boolean(),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.describe'>>>
 
 /** host.pickDirectory request payload (empty object literal). */
@@ -72,3 +73,11 @@ export const hostOpenPathRequestSchema = z.object({
 export const hostOpenPathValueSchema = z.object({
   opened: z.literal(true),
 }) satisfies z.ZodType<Wire<ResponseValue<'host.openPath'>>>
+
+/** host.restart request payload (empty object literal). */
+export const hostRestartRequestSchema = z.object({}) satisfies z.ZodType<Wire<RequestPayload<'host.restart'>>>
+
+/** host.restart response value: the acknowledgement sent before the process stops. */
+export const hostRestartValueSchema = z.object({
+  restarting: z.literal(true),
+}) satisfies z.ZodType<Wire<ResponseValue<'host.restart'>>>

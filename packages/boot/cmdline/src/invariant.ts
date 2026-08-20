@@ -14,10 +14,12 @@ export const name = 'cmdline-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant: `cmdlineArgs` is an immutable launcher fact that any
- * number of ordinary plugins may read. App-owned providers and consumers use
- * normal Cordis service injection, whose missing dependencies are already
- * reported by Loader settlement.
+ * No runtime invariant: `cmdlineArgs`, `appExit`, and `appRestart` are
+ * immutable launcher facts that any number of ordinary plugins may read, and
+ * an absent lifetime request is a supported deployment rather than a broken
+ * relation. App-owned providers and consumers use normal Cordis service
+ * injection, whose missing dependencies are already reported by Loader
+ * settlement.
  */
 const install: InvariantInstaller = () => {}
 

@@ -58,6 +58,23 @@ A request whose handling throws (a malformed %-escape hitting `decodeURIComponen
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
+<a id="ctxwebauth--webauth"></a>
+
+### `ctx.webAuth` — `WebAuth`
+
+Request authentication state shared with routes that apply finer authorization.
+
+```ts cordis-catalog
+/**
+ * Test one Cookie header against the active in-memory sessions.
+ * @param cookie - Cookie header supplied by an HTTP or Fetch request.
+ * @returns whether the header identifies a currently valid Web session.
+ */
+authenticated(cookie: string | undefined): boolean
+```
+
+Source: [`packages/host/web-auth/src/index.ts:16`](../../packages/host/web-auth/src/index.ts)
+
 <a id="ctxwebauthtoken--webauthtoken"></a>
 
 ### `ctx.webAuthToken` — `WebAuthToken`

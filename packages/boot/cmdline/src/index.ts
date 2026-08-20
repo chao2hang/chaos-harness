@@ -13,6 +13,10 @@
  * can inject that service and read it from lazily resolved config —
  * `port: !!js ctx.webStartup.port ?? 3080` — so a flag beats the value written
  * beside it. No row has launcher-level command-line status.
+ *
+ * The same provision carries the process-lifetime requests only a launcher can
+ * serve: {@link AppExit} ends this invocation, and {@link AppRestart} replaces
+ * it with a successor booted from the identical command line.
  * @module @deepseek-ai/dsh-cmdline
  */
 
@@ -41,12 +45,30 @@ export interface AppExit {
   (code: number): void
 }
 
+/**
+ * Request bounded process replacement: dispose the tree, then hand this
+ * invocation's command line to a successor process that takes over the
+ * predecessor's listening sockets, working directory, and environment.
+ *
+ * Only a launcher that can actually start a successor provides this, so its
+ * absence is the honest report that the deployment cannot restart itself (an
+ * embedded host, or a surface whose lifetime a supervisor owns). Consumers
+ * must treat `ctx.appRestart === undefined` as an unavailable capability
+ * rather than falling back to plain exit, which would leave no server running.
+ */
+export interface AppRestart {
+  /** Request disposal followed by successor launch; returns before the successor exists. */
+  (): void
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** The invocation's inner arguments; provided by a launcher before the tree mounts. */
     cmdlineArgs?: CmdlineArgs
     /** Bounded process-exit request; provided by a launcher before the tree mounts. */
     appExit?: AppExit
+    /** Bounded process-replacement request; provided only by a launcher that can start a successor. */
+    appRestart?: AppRestart
   }
 }
 
@@ -56,19 +78,24 @@ export interface CmdlineHost {
   args: readonly string[]
   /** Bounded process-exit request. */
   exit: AppExit
+  /** Bounded process-replacement request; omitted by a launcher that cannot start a successor. */
+  restart?: AppRestart
 }
 
 /**
- * Provide the command line and the exit request on a host context before any
- * tree entry mounts. Both are launcher facts, not config: an embedding host
- * with no command line provides an empty argument list.
+ * Provide the command line and the process-lifetime requests on a host context
+ * before any tree entry mounts. All are launcher facts, not config: an
+ * embedding host with no command line provides an empty argument list, and one
+ * that cannot start a successor omits `restart` so `ctx.appRestart` stays
+ * absent instead of resolving to a plain exit.
  * @param ctx - the host context the tree will mount under.
- * @param host - the invocation's arguments and its exit request.
+ * @param host - the invocation's arguments and its lifetime requests.
  */
 export function provideCmdline(ctx: Context, host: CmdlineHost): void {
   const snapshot: readonly string[] = Object.freeze([...host.args])
   ctx.provide('cmdlineArgs', { get: () => snapshot })
   ctx.provide('appExit', host.exit)
+  if (host.restart !== undefined) ctx.provide('appRestart', host.restart)
 }
 
 /** The process streams commander output is written to; production writes to the process. */

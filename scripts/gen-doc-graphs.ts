@@ -514,6 +514,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes.',
   },
   {
+    key: 'webAuth',
+    pkg: 'web-auth',
+    title: 'Web session authentication',
+    mode: 'core',
+    consumers: ['connection'],
+    note: 'Verifies the session Cookie for routes that authorize authenticated remote operations after transport admission.',
+  },
+  {
     key: 'webAuthToken',
     pkg: 'web-auth',
     title: 'Web authentication preflight',

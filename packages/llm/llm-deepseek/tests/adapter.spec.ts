@@ -90,6 +90,48 @@ describe('DeepSeekAdapter against a mock server', () => {
     expect(server.headers[0]).not.toHaveProperty('x-deepseek-harness-compact')
   })
 
+  it('passes plain-turn reasoning back in the next request history', async () => {
+    const reasoningEvents = [
+      '{"choices":[{"delta":{"role":"assistant","content":null,"reasoning_content":"considering"}}]}',
+      '{"choices":[{"delta":{"content":"first answer"}}]}',
+      '{"choices":[{"delta":{"content":""},"finish_reason":"stop"}]}',
+      '[DONE]',
+    ]
+    const server = await mockServer([
+      { kind: 'sse', events: reasoningEvents },
+      { kind: 'sse', events: textEvents },
+    ])
+    const ctx = await harness(server.url)
+    const firstUser = createUserMessage({
+      content: [{ type: 'text', text: 'first question' }],
+      source: { kind: 'plugin', plugin: 'test' },
+    })
+    const first = await assemble(ctx, {
+      model: 'deepseek-v4-flash',
+      messages: [firstUser],
+    })
+
+    await assemble(ctx, {
+      model: 'deepseek-v4-flash',
+      messages: [
+        firstUser,
+        first.message,
+        createUserMessage({
+          content: [{ type: 'text', text: 'follow-up' }],
+          source: { kind: 'plugin', plugin: 'test' },
+        }),
+      ],
+    })
+
+    expect(server.requests[1]).toMatchObject({
+      messages: [
+        { role: 'user', content: 'first question' },
+        { role: 'assistant', content: 'first answer', reasoning_content: 'considering' },
+        { role: 'user', content: 'follow-up' },
+      ],
+    })
+  })
+
   it('streams raw chunks through ctx.llm.stream', async () => {
     const server = await mockServer([{ kind: 'sse', events: textEvents, delayMs: 2 }])
     const ctx = await harness(server.url)

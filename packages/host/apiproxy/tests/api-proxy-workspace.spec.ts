@@ -64,6 +64,8 @@ async function harness(
   extras: {
     openPath?: (path: string, signal: AbortSignal) => Promise<void>
     canOpenPath?: () => boolean
+    requestRestart?: () => void
+    restartGraceMs?: number
   } = {},
 ) {
   const ctx = new Context()
@@ -107,6 +109,8 @@ async function harness(
     cwd: root,
     ...extras.openPath === undefined ? {} : { openPath: extras.openPath },
     ...extras.canOpenPath === undefined ? {} : { canOpenPath: extras.canOpenPath },
+    ...extras.requestRestart === undefined ? {} : { requestRestart: extras.requestRestart },
+    ...extras.restartGraceMs === undefined ? {} : { restartGraceMs: extras.restartGraceMs },
   })
   return { api, ctx, storageDomain, root }
 }
@@ -256,6 +260,83 @@ describe('host.openPath', () => {
     const pending = api.host.openPath(request({ path: '/tmp/a.txt' }), abort.signal)
     abort.abort()
     expect((await pending).result).toMatchObject({ ok: false, error: { code: 'cancelled' } })
+  })
+})
+
+describe('host.restart', () => {
+  it('describes whether this deployment can replace its own process', async () => {
+    const restartable = await harness(undefined, undefined, { requestRestart: () => {} })
+    const fixed = await harness()
+    expect(expectOk(await restartable.api.host.describe(request({}))).canRestart).toBe(true)
+    expect(expectOk(await fixed.api.host.describe(request({}))).canRestart).toBe(false)
+  })
+
+  it('acknowledges first and asks the launcher only after the grace', async () => {
+    vi.useFakeTimers()
+    try {
+      const requested: true[] = []
+      const { api } = await harness(undefined, undefined, {
+        requestRestart: () => { requested.push(true) },
+        restartGraceMs: 25,
+      })
+
+      expect((await api.host.restart(request({}))).result).toEqual({ ok: true, value: { restarting: true } })
+      // The acknowledgement has to leave before the server stops, so nothing
+      // may have asked the launcher yet at this point.
+      expect(requested).toEqual([])
+
+      await vi.advanceTimersByTimeAsync(25)
+      expect(requested).toEqual([true])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('asks the launcher once for repeated requests inside one grace', async () => {
+    vi.useFakeTimers()
+    try {
+      const requested: true[] = []
+      const { api } = await harness(undefined, undefined, {
+        requestRestart: () => { requested.push(true) },
+        restartGraceMs: 25,
+      })
+
+      await api.host.restart(request({}))
+      await api.host.restart(request({}))
+      await vi.advanceTimersByTimeAsync(25)
+
+      expect(requested).toEqual([true])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('abandons a pending handover when the tree is disposed inside the grace', async () => {
+    vi.useFakeTimers()
+    try {
+      const requested: true[] = []
+      const { api, ctx } = await harness(undefined, undefined, {
+        requestRestart: () => { requested.push(true) },
+        restartGraceMs: 25,
+      })
+
+      await api.host.restart(request({}))
+      await ctx.fiber.dispose()
+      await vi.advanceTimersByTimeAsync(25)
+
+      // Teardown for any other reason (a signal, a failing sibling) must not
+      // leave behind a successor nobody asked for.
+      expect(requested).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('refuses when the launcher provides no process-replacement request', async () => {
+    const { api } = await harness()
+    expect((await api.host.restart(request({}))).result).toMatchObject({
+      ok: false, error: { code: 'restart-unavailable' },
+    })
   })
 })
 

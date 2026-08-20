@@ -183,6 +183,7 @@ flowchart LR
   pkg_modules["modules"]
   pkg_hmr["hmr"]
   pkg_web_auth["web-auth"]
+  svc_webAuth["ctx.webAuth<br/>Web session authentication"]
   svc_webAuthToken["ctx.webAuthToken<br/>Web authentication preflight"]
   svc_clientModules["ctx.clientModules<br/>Client plugin graph host"]
   pkg_workflow["workflow"]
@@ -290,6 +291,7 @@ flowchart LR
   pkg_typert_registry --> svc_typert
   pkg_user_questions --> svc_userQuestions
   pkg_web --> svc_web
+  pkg_web_auth --> svc_webAuth
   pkg_web_auth --> svc_webAuthToken
   pkg_web_fetch_http --> svc_web
   pkg_web_search_deepseek --> svc_web
@@ -405,6 +407,7 @@ flowchart LR
   svc_typert --> pkg_typert_loader
   svc_userQuestions --> pkg_tool_ask_user
   svc_web --> pkg_tool_web
+  svc_webAuth --> pkg_connection
   svc_webAuthToken --> pkg_web_auth
   svc_webAuthToken --> pkg_webserver
   svc_webServer --> pkg_connection
@@ -468,6 +471,7 @@ flowchart LR
 | `ctx.spillStore` | `seam` | [`spill`](../packages/spill/spill) | [`spill-local`](../packages/spill/spill-local) | [`spill-policy`](../packages/spill/spill-policy) | - | 后端保存过大的工具文本，并返回面向模型的定位信息和取回提示；spill-policy 是 tools/post-execute 消费方，负责决定何时 spill。 |
 | `ctx.directoryPicker` | `seam` | `directory-picker` | `directory-picker-native`, `directory-picker-browse` | `apiproxy` | - | 带判别标记的交互能力：原生后端在 Host 显示设备上打开一个操作系统选择器，浏览后端为应用内浏览器提供列表与创建原语；双端后端通过其浏览器侧填充 ui-workspace 目录流程的 slot（不通过协议发布）。 |
 | `ctx.webServer` | `core` | `webserver` | - | `connection`, `modules`, `hmr` | - | 普通的 node:http 载体：具名路由注册表、索引转换 tap，以及静态 dist 回退；Web 传输插件注册自己的路由。 |
+| `ctx.webAuth` | `core` | `web-auth` | - | `connection` | - | 验证会话 Cookie，供路由在传输准入后授权经过认证的远程操作。 |
 | `ctx.webAuthToken` | `core` | `web-auth` | - | `webserver`, `web-auth` | - | 在监听器激活前解析部署令牌；认证插件消费进程内结果以保护 HTTP 和 WebSocket 流量。 |
 | `ctx.clientModules` | `core` | `modules` | - | `hmr` | - | 通过增量 `dsh.client` 扫描组合 __DSH_BOOT__ 入口图，提供插件组合包，并通知重建／图变更订阅方。 |
 | `ctx.workflowEngine` | `seam` | [`workflow`](../packages/workflow/workflow) | [`workflow-worker-thread`](../packages/workflow/workflow-worker-thread) | [`tool-workflow`](../packages/workflow/tool-workflow), [`tool-ralph`](../packages/workflow/tool-ralph) | - | 每个上下文使用一个引擎，与 bash 相同，且没有具名提供方注册表；通用工作流与固定 Ralph 消费方启动运行，其中的 agent() 调用通过 ctx.subagents 扇出。 |

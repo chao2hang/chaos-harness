@@ -18,6 +18,7 @@ import {
   hostCreateDirectoryRequestSchema, hostCreateDirectoryValueSchema,
   hostDescribeRequestSchema, hostDescribeValueSchema,
   hostListDirectoryRequestSchema, hostListDirectoryValueSchema,
+  hostRestartRequestSchema, hostRestartValueSchema,
 } from '../src/api/host.schema.ts'
 import {
   workspaceArchiveSessionRequestSchema, workspaceArchiveSessionValueSchema,
@@ -312,15 +313,31 @@ describe('host domain schemas', () => {
   it('validates describe request/value', () => {
     expect(hostDescribeRequestSchema.parse({})).toEqual({})
     const value = hostDescribeValueSchema.parse({
-      version: '1', cwd: '/x', provider: 'p', model: 'm', attachedSessions: 2, canOpenPath: true,
+      version: '1', cwd: '/x', provider: 'p', model: 'm', attachedSessions: 2, canOpenPath: true, canRestart: true,
     })
-    expect(value).toMatchObject({ provider: 'p', model: 'm', attachedSessions: 2, canOpenPath: true })
+    expect(value).toMatchObject({
+      provider: 'p', model: 'm', attachedSessions: 2, canOpenPath: true, canRestart: true,
+    })
     expect(hostDescribeValueSchema.parse({
-      version: '1', cwd: '/x', attachedSessions: 0, canOpenPath: false,
+      version: '1', cwd: '/x', attachedSessions: 0, canOpenPath: false, canRestart: false,
     }).provider).toBeUndefined()
     expect(() => hostDescribeValueSchema.parse({
       version: '1', cwd: '/x', attachedSessions: 0,
     })).toThrow()
+    // Both capability flags are part of the wire value: a client that must
+    // decide whether to offer a control cannot treat an absent flag as false.
+    expect(() => hostDescribeValueSchema.parse({
+      version: '1', cwd: '/x', attachedSessions: 0, canOpenPath: true,
+    })).toThrow()
+  })
+
+  it('validates the restart acknowledgement', () => {
+    expect(hostRestartRequestSchema.parse({})).toEqual({})
+    expect(hostRestartValueSchema.parse({ restarting: true })).toEqual({ restarting: true })
+    // The acknowledgement has one legal value; a false one would read as a
+    // refusal, which the wire expresses as an RpcError instead.
+    expect(() => hostRestartValueSchema.parse({ restarting: false })).toThrow()
+    expect(() => hostRestartValueSchema.parse({})).toThrow()
   })
 
   it('validates the browse listing/creation payloads', () => {

@@ -50,10 +50,12 @@ class CatalogAdapter extends LlmAdapter {
 
   override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
     if (this.exactError !== undefined) return Promise.reject(this.exactError)
+    const listed = this.models instanceof Error ? undefined : this.models.find(entry => entry.id === model)
     return Promise.resolve({
       provider,
       id: model,
       name: model,
+      ...listed?.inputModalities === undefined ? {} : { inputModalities: listed.inputModalities },
       ...this.reasoning === undefined ? {} : { reasoning: this.reasoning },
     })
   }
@@ -88,8 +90,8 @@ async function harness(logged?: {
   await ctx.plugin(UserQuestionService)
   await ctx.plugin(AgentRegistry)
   ctx.llm.registerAdapter(['deepseek-official'], new CatalogAdapter('DeepSeek', [
-    { provider: 'deepseek-official', id: 'deepseek-chat', name: 'DeepSeek Chat' },
-    { provider: 'deepseek-official', id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', description: 'Reasoning model' },
+    { provider: 'deepseek-official', id: 'deepseek-chat', name: 'DeepSeek Chat', inputModalities: ['text', 'image'] },
+    { provider: 'deepseek-official', id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', description: 'Reasoning model', inputModalities: ['text', 'image'] },
   ], REASONING))
   ctx.llm.registerAdapter(['broken'], new CatalogAdapter('Broken Provider', new Error('catalog offline')))
   ctx.llm.registerAdapter(['metadata-broken'], new CatalogAdapter('Metadata Broken', [
@@ -286,11 +288,12 @@ describe('Web session model selection', () => {
       id: 'deepseek-official',
       name: 'DeepSeek',
       models: [
-        { id: 'deepseek-chat', name: 'DeepSeek Chat', reasoning: REASONING },
+        { id: 'deepseek-chat', name: 'DeepSeek Chat', inputModalities: ['text', 'image'], reasoning: REASONING },
         {
           id: 'deepseek-reasoner',
           name: 'DeepSeek Reasoner',
           description: 'Reasoning model',
+          inputModalities: ['text', 'image'],
           reasoning: REASONING,
         },
       ],

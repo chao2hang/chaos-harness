@@ -2055,6 +2055,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'webAuth',
+    summary: 'Request authentication state shared with routes that apply finer authorization.',
+    description: 'Request authentication state shared with routes that apply finer authorization.',
+    methods: [
+      {
+        signature: 'authenticated(cookie: string | undefined): boolean',
+        description: 'Test one Cookie header against the active in-memory sessions.',
+        parameters: [{ name: 'cookie', description: 'Cookie header supplied by an HTTP or Fetch request.' }],
+        returns: 'whether the header identifies a currently valid Web session.',
+      },
+    ],
+  },
+  {
     key: 'webAuthToken',
     summary: 'Process-local Web authentication token state.',
     description: 'Process-local Web authentication token state.',

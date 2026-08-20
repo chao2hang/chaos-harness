@@ -15,8 +15,10 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
+// Type-only: brings the launcher's `ctx.appRestart` merge into this program.
+import type {} from '@deepseek-ai/dsh-cmdline'
 import type { ApiProxy } from './api/index.ts'
-import { createApiProxy, DEFAULT_COLD_BLANK_PROBE_MAX_BYTES } from './api-proxy.ts'
+import { createApiProxy, DEFAULT_COLD_BLANK_PROBE_MAX_BYTES, DEFAULT_RESTART_GRACE_MS } from './api-proxy.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
   type SessionLogCompressionLevel,
@@ -59,6 +61,15 @@ export interface Config {
    * @default 1024
    */
   coldBlankProbeMaxBytes?: number
+  /**
+   * Milliseconds between acknowledging `host.restart` and asking the launcher
+   * to replace the process, so the acknowledgement reaches the caller before
+   * the server stops. Raise it for a deployment reached over a slower hop than
+   * loopback; `0` requests replacement as soon as the response is handed to
+   * the carrier.
+   * @default 250
+   */
+  restartGraceMs?: number
 }
 
 /**
@@ -77,6 +88,7 @@ export class ApiProxyService extends Service implements ApiProxy {
     sessionExportCompressionLevel: z.number().step(1).min(0).max(9)
       .default(DEFAULT_SESSION_LOG_COMPRESSION_LEVEL) as z<SessionLogCompressionLevel>,
     coldBlankProbeMaxBytes: z.natural().default(DEFAULT_COLD_BLANK_PROBE_MAX_BYTES),
+    restartGraceMs: z.natural().default(DEFAULT_RESTART_GRACE_MS),
   })
 
   readonly sessions: ApiProxy['sessions']
@@ -95,6 +107,11 @@ export class ApiProxyService extends Service implements ApiProxy {
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'apiProxy')
+    // Read through the global service store, not the property proxy: the
+    // process-replacement request is an optional launcher fact this service
+    // does not inject, and its absence is the honest report that this
+    // deployment cannot restart itself.
+    const appRestart = ctx.get('appRestart')
     const api = createApiProxy(ctx, {
       defaultModelSelection: () => ctx.agentDefaultModel.currentSelection(),
       saveDefaultModelSelection: selection => ctx.agentDefaultModel.saveSelection(selection),
@@ -106,6 +123,8 @@ export class ApiProxyService extends Service implements ApiProxy {
       ...(config.coldBlankProbeMaxBytes === undefined
         ? {}
         : { coldBlankProbeMaxBytes: config.coldBlankProbeMaxBytes }),
+      ...(config.restartGraceMs === undefined ? {} : { restartGraceMs: config.restartGraceMs }),
+      ...(appRestart === undefined ? {} : { requestRestart: () => { appRestart() } }),
     })
     this.sessions = api.sessions
     this.subagents = api.subagents

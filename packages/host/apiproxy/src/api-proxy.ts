@@ -135,6 +135,14 @@ const COLD_SUMMARY_BATCH_SIZE = 16
 /** Default maximum artifact size eligible for one cold blankness read. */
 export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
 
+/**
+ * Default grace between acknowledging `host.restart` and asking the launcher
+ * to replace the process. It buys the acknowledgement a flush over loopback
+ * without making the handover feel deferred; a deployment reached across a
+ * slower hop raises it.
+ */
+export const DEFAULT_RESTART_GRACE_MS = 250
+
 /** Conversation message event types (the pagination counting unit). */
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
 
@@ -348,10 +356,39 @@ async function buildModelCatalog(ctx: Context): Promise<{
               ? {}
               : { defaultEffort: resolved.reasoning.defaultEffort },
           }
+        const configurable = ctx.llm.listConfigurableProviders().find(entry => entry.provider === provider.id)
+        const descriptor = configurable?.settingsNs === 'llm-pi-ai'
+          ? ctx.get('settings')?.describe().find(entry => entry.ns === settingsNamespace('llm-pi-ai'))
+          : undefined
+        const profile = descriptor === undefined || configurable === undefined
+          ? undefined
+          : configurable.settingsPath.reduce<unknown>((value, key) =>
+            typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined,
+          descriptor.value)
+        const configuredModels = typeof profile === 'object' && profile !== null
+          ? (profile as Record<string, unknown>).models
+          : undefined
+        const configuredModel = Array.isArray(configuredModels)
+          ? configuredModels.find(entry => typeof entry === 'object' && entry !== null && (entry as Record<string, unknown>).id === model.id)
+          : undefined
+        const capabilitiesEditable = configuredModel !== undefined
+        const configuredMaxTokens = typeof configuredModel === 'object' && configuredModel !== null
+          && typeof (configuredModel as Record<string, unknown>).maxTokens === 'number'
+          ? (configuredModel as Record<string, unknown>).maxTokens as number
+          : typeof profile === 'object' && profile !== null
+            && typeof (profile as Record<string, unknown>).defaultMaxTokens === 'number'
+            ? (profile as Record<string, unknown>).defaultMaxTokens as number
+            : undefined
         return {
           id: model.id,
           name: model.name,
           ...model.description === undefined ? {} : { description: model.description },
+          ...resolved.inputModalities === undefined
+            ? {}
+            : { inputModalities: [...resolved.inputModalities] },
+          ...resolved.context?.contextWindow === undefined ? {} : { contextWindow: resolved.context.contextWindow },
+          ...configuredMaxTokens === undefined ? {} : { maxTokens: configuredMaxTokens },
+          ...capabilitiesEditable ? { capabilitiesEditable: true as const } : {},
           ...reasoning === undefined ? {} : { reasoning },
         }
       }))
@@ -667,6 +704,15 @@ export interface ApiProxyDefaults {
    * falls back to platform detection ({@link canOpenNativePath}).
    */
   canOpenPath?: () => boolean
+  /**
+   * Ask the launcher to replace this process with a successor booted from the
+   * same command line. Absent means the deployment cannot restart itself:
+   * `host.describe` then reports `canRestart: false` and `host.restart` fails
+   * with `restart-unavailable` rather than exiting into nothing.
+   */
+  requestRestart?: () => void
+  /** Grace between the restart acknowledgement and the replacement request; defaults to {@link DEFAULT_RESTART_GRACE_MS}. */
+  restartGraceMs?: number
 }
 
 /** The tool/call payload fields the presenter path reads. */
@@ -1920,6 +1966,15 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
     return defaults.openPath !== undefined || canOpenNativePath()
   }
 
+  // The gap between acknowledging a restart and stopping the server. Held so
+  // teardown can cancel it: a tree disposed for any other reason during the
+  // grace (a signal, a failing sibling) must not have this timer ask the
+  // launcher for a successor nobody wants.
+  let pendingRestart: ReturnType<typeof setTimeout> | undefined
+  ctx.effect(() => () => {
+    if (pendingRestart !== undefined) clearTimeout(pendingRestart)
+  }, 'apiProxy: restart handoff')
+
   /** Missing-service report shared by the credentials domain. */
   function credentialsAbsent(): RpcError {
     return { code: 'internal', message: 'credentials service is absent: this deployment does not mount a credential provider (e.g. @deepseek-ai/dsh-credentials-local) in its composition', details: {} }
@@ -2280,11 +2335,61 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       },
 
       async selectModel(request) {
-        const { sessionId, provider, model, reasoningEffort } = request.payload
+        const { sessionId, provider, model, reasoningEffort, contextWindow, maxTokens, imageInput, enableReasoning } = request.payload
         const found = await agentFor(sessionId)
         if ('error' in found) return err(request, found.error)
         return serializeImageAdmission(found.agent, async () => {
           try {
+            if (contextWindow !== undefined || maxTokens !== undefined || imageInput !== undefined || enableReasoning !== undefined) {
+              const configurable = ctx.llm.listConfigurableProviders().find(entry =>
+                entry.provider === provider && entry.settingsNs === 'llm-pi-ai')
+              const settings = ctx.get('settings')
+              const ns = settingsNamespace('llm-pi-ai')
+              const descriptor = settings?.describe().find(entry => entry.ns === ns)
+              const profile = descriptor === undefined || configurable === undefined
+                ? undefined
+                : configurable.settingsPath.reduce<unknown>((value, key) =>
+                  typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined,
+                descriptor.value)
+              const models = typeof profile === 'object' && profile !== null
+                ? (profile as Record<string, unknown>).models
+                : undefined
+              const modelIndex = Array.isArray(models)
+                ? models.findIndex(entry => typeof entry === 'object' && entry !== null && (entry as Record<string, unknown>).id === model)
+                : -1
+              if (settings === undefined || descriptor === undefined || configurable === undefined || modelIndex < 0) {
+                return err(request, {
+                  code: 'model-unavailable',
+                  message: `Model "${model}" does not expose editable global capabilities.`,
+                  details: { provider, model },
+                })
+              }
+              const configuredModelList = models as unknown[]
+              const updatedModels = configuredModelList.map((entry, index) => index !== modelIndex
+                ? entry
+                : {
+                  ...(entry as Record<string, unknown>),
+                  ...contextWindow === undefined ? {} : { contextWindow },
+                  ...maxTokens === undefined ? {} : { maxTokens },
+                  ...imageInput === undefined ? {} : { input: imageInput ? ['text', 'image'] : ['text'] },
+                  ...enableReasoning === undefined ? {} : {
+                    reasoningEfforts: {
+                      off: null,
+                      minimal: 'minimal',
+                      low: 'low',
+                      medium: 'medium',
+                      high: 'high',
+                      xhigh: 'xhigh',
+                      max: 'max',
+                    },
+                  },
+                })
+              await settings.mutate(ns, [{
+                op: 'set',
+                path: [...configurable.settingsPath, 'models'],
+                value: updatedModels,
+              }], descriptor.revision)
+            }
             const resolved = await ctx.llm.resolveCallConfig({
               provider,
               model,
@@ -2935,6 +3040,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           model: selection.model,
           attachedSessions: ctx.agents.list().length,
           canOpenPath: canOpenPaths(),
+          canRestart: defaults.requestRestart !== undefined,
         }))
       },
 
@@ -3007,6 +3113,29 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
 
       async openPath(request, signal) {
         return openPath(request, request.payload.path, signal)
+      },
+
+      restart(request) {
+        const requestRestart = defaults.requestRestart
+        if (requestRestart === undefined) {
+          return Promise.resolve(err(request, {
+            code: 'restart-unavailable',
+            message: 'host.restart needs a launcher that can start a successor process; this deployment provides no ctx.appRestart',
+            details: {},
+          }))
+        }
+        // Acknowledge first, stop afterwards: disposing the tree inside the
+        // call would destroy this very connection before its response left,
+        // so the caller could not tell a restart from a crash. The grace is
+        // only for that flush — correctness does not rest on it, because a
+        // client observes the handover as a disconnect either way.
+        if (pendingRestart === undefined) {
+          pendingRestart = setTimeout(() => {
+            pendingRestart = undefined
+            requestRestart()
+          }, defaults.restartGraceMs ?? DEFAULT_RESTART_GRACE_MS)
+        }
+        return Promise.resolve(ok(request, { restarting: true as const }))
       },
     },
 

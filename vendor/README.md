@@ -14,13 +14,15 @@ Upstream workspace: `cordis-workspace` (local checkout: `~/repos/cordis-workspac
 |---|---|---|---|---|---|
 | `cosmokit/` | `@deepseek-ai/cosmokit` | `cosmokit` | 1.8.1 | https://github.com/deepseek-harness/cosmokit | `16f6fc058ade66e8ac5da0033d35a8d0f279f544` |
 | `schemastery/` | `@deepseek-ai/schemastery` | `schemastery` | 3.18.0 | https://github.com/deepseek-harness/schemastery (`packages/core`) | `e67cee00ad725bd1534aee930a979ea3eec6f698` |
-| `cordis/` | `@deepseek-ai/cordis` | `cordis` | 4.0.0-rc.7 | https://github.com/cordiverse/cordis (`packages/core`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
-| `loader/` | `@deepseek-ai/cordis-plugin-loader` | `@cordisjs/plugin-loader` | 1.0.0-rc.5 | https://github.com/cordiverse/cordis (`packages/loader`) | `56b3d4f725681cf4556c1a8695a709cc3b6eed74` |
-| `include/` | `@deepseek-ai/cordis-plugin-include` | `@cordisjs/plugin-include` | 1.0.4 | https://github.com/deepseek-harness/cordis (`packages/include`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `group/` | `@deepseek-ai/cordis-plugin-group` | `@cordisjs/plugin-group` | 1.0.0 | https://github.com/deepseek-harness/cordis (`packages/group`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `timer/` | `@deepseek-ai/cordis-plugin-timer` | `@cordisjs/plugin-timer` | 1.1.2 | https://github.com/deepseek-harness/cordis (`packages/timer`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `hmr/` | `@deepseek-ai/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | 1.0.15 | https://github.com/deepseek-harness/cordis (`packages/hmr`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
-| `logger-console/` | `@deepseek-ai/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | 1.0.0 | https://github.com/deepseek-harness/cordis (`packages/logger-console`) | `abb0a307cb1d3b0947f455d590cf5ba922d4caa4` |
+| `cordis/` | `@deepseek-ai/cordis` | `cordis` | 4.0.0-rc.7 | https://github.com/cordiverse/cordis (`packages/core`) | `8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4` |
+| `loader/` | `@deepseek-ai/cordis-plugin-loader` | `@cordisjs/plugin-loader` | 1.0.0-rc.5 | https://github.com/cordiverse/cordis (`packages/loader`) | `8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4` |
+| `include/` | `@deepseek-ai/cordis-plugin-include` | `@cordisjs/plugin-include` | 1.0.4 | https://github.com/cordiverse/cordis (`packages/include`) | `8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4` |
+| `group/` | `@deepseek-ai/cordis-plugin-group` | `@cordisjs/plugin-group` | 1.0.0 | https://github.com/cordiverse/cordis (`packages/group`) | `8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4` |
+| `timer/` | `@deepseek-ai/cordis-plugin-timer` | `@cordisjs/plugin-timer` | 1.1.2 | https://github.com/cordiverse/cordis (`packages/timer`) | `8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4` |
+| `hmr/` | `@deepseek-ai/cordis-plugin-hmr` | `@cordisjs/plugin-hmr` | 1.0.15 | https://github.com/cordiverse/cordis (`packages/hmr`) | `8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4` |
+| `logger-console/` | `@deepseek-ai/cordis-plugin-logger-console` | `@cordisjs/plugin-logger-console` | 1.0.0 | https://github.com/cordiverse/cordis (`packages/logger-console`) | `8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4` |
+
+> The seven plugin packages share `cordiverse/cordis` as a single upstream monorepo (`packages/<name>/`). The prior manifest entries pointed at the private `deepseek-harness/cordis` fork that does not exist on public GitHub; the upstream URLs and pins here are corrected against `cordiverse/cordis@8cc9e33fab69e2d0476d126baaf2acb24e6a6ab4` (the reachable anchor). Vendored patch versions for `cordis-plugin-include`/`group`/`timer`/`hmr`/`logger-console` exceed the public npm releases by one patch each (1.0.6/1.0.1/1.1.3/1.0.16/1.0.1 vs public 1.0.4/1.0.0/1.1.2/1.0.15/1.0.0); the difference is internal to the harness release line and not yet upstreamed.
 
 Third-party dependencies of the vendored packages stay on npm: `@standard-schema/spec`, `js-yaml`, `chokidar`, `picomatch`, `@babel/code-frame`, `supports-color`, `node-addon-require-builtin`.
 

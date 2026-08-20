@@ -144,6 +144,9 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // also shares its generated FFI code through a hashed runtime chunk.
   '@deepseek-ai/dsh-sandbox-windows-acl': ['lib/runner.js', 'lib/types-*.js'],
   '@deepseek-ai/dsh-skill-badge': ['assets'],
+  // The Web auth preflight bundle ships beside the lib as its own subpath,
+  // resolved through the package's ./preflight export.
+  '@deepseek-ai/dsh-host-web-auth': ['lib/preflight.js'],
   '@deepseek-ai/dsh-subprocess-local': ['scripts/ensure-spawn-helper.mjs'],
 }
 

@@ -50,10 +50,12 @@ const settlementConfigPath = fileURLToPath(new URL('../subagent-settlement.cordi
 const startupFailureConfigPath = fileURLToPath(new URL('./fixtures/startup-activation-error/cordis.yml', import.meta.url))
 const startupFailureExpected = join(snapshotsDir, 'startup-activation-error', 'stderr.expected.txt')
 const binScript = fileURLToPath(new URL('./fixtures/headless-driver.ts', import.meta.url))
+const deepseekPassbackBinScript = fileURLToPath(new URL('./fixtures/deepseek-passback-driver.ts', import.meta.url))
 const dshBinScript = fileURLToPath(new URL('../../../apps/cli/src/bin.ts', import.meta.url))
 const tsconfigPath = fileURLToPath(new URL('../../../tsconfig.json', import.meta.url))
 const reasoningConfigPath = fileURLToPath(new URL('./fixtures/cli.cordis.yml', import.meta.url))
 const deepseekDefaultsConfigPath = fileURLToPath(new URL('./fixtures/deepseek-defaults.cordis.yml', import.meta.url))
+const deepseekPassbackConfigPath = fileURLToPath(new URL('./fixtures/deepseek-passback.cordis.yml', import.meta.url))
 const headlessOverlayPath = fileURLToPath(new URL('./fixtures/headless-profile.cordis.yml', import.meta.url))
 const headlessSessionExpected = join(snapshotsDir, 'headless-profile', 'session.expected.jsonl')
 const headlessFailureExpected = join(snapshotsDir, 'headless-profile', 'stderr.expected.txt')
@@ -73,6 +75,40 @@ interface DeepSeekDefaultsServer {
   readonly url: string
   readonly requests: JsonObject[]
   close(): Promise<void>
+}
+
+/** Serve deterministic DeepSeek-compatible responses while retaining their request bodies. */
+async function deepseekPassbackServer(): Promise<DeepSeekDefaultsServer> {
+  const requests: JsonObject[] = []
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    let body = ''
+    request.setEncoding('utf8')
+    request.on('data', (chunk: string) => { body += chunk })
+    request.on('end', () => {
+      requests.push(JSON.parse(body) as JsonObject)
+      const first = requests.length === 1
+      response.writeHead(200, { 'content-type': 'text/event-stream' })
+      setTimeout(() => {
+        response.end([
+          first
+            ? 'data: {"choices":[{"delta":{"role":"assistant","content":null,"reasoning_content":"retained thought"}}]}'
+            : 'data: {"choices":[{"delta":{"role":"assistant","content":null}}]}',
+          `data: {"choices":[{"delta":{"content":"${first ? 'FIRST_OK' : 'SECOND_OK'}"}}]}`,
+          'data: {"choices":[{"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":3,"completion_tokens":1}}',
+          'data: [DONE]',
+          '',
+        ].join('\n\n'))
+      }, 20)
+    })
+  })
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('DeepSeek passback snapshot server has no port')
+  return {
+    url: `http://127.0.0.1:${address.port}`,
+    requests,
+    close: () => new Promise(resolve => server.close(() => { resolve() })),
+  }
 }
 
 /** Serve one deterministic DeepSeek-compatible response while retaining its request body. */
@@ -562,6 +598,45 @@ describe('headless stream-json snapshots', () => {
         maxTokens: true,
         reasoningEffort: true,
       })
+    } finally {
+      await server.close()
+    }
+  }, LOADER_SMOKE_TEST_TIMEOUT_MS)
+
+  it('passes plain-turn reasoning through two turns of the headless composition', async () => {
+    const server = await deepseekPassbackServer()
+    try {
+      const result = await runLoaderSmoke({
+        label: 'DeepSeek reasoning passback headless snapshot',
+        tempDirPrefix: 'headless-snapshot-deepseek-passback-',
+        binScript: deepseekPassbackBinScript,
+        libBinScript: deepseekPassbackBinScript,
+        configPath: deepseekPassbackConfigPath,
+        binArgs: [
+          deepseekPassbackConfigPath,
+          'first question',
+          'follow-up question',
+        ],
+        tsconfigPath,
+        env: {
+          DEEPSEEK_API_KEY: 'snapshot-key',
+          DSH_SNAPSHOT_BASE_URL: server.url,
+          NODE_OPTIONS: [process.env.NODE_OPTIONS, '--disable-warning=ExperimentalWarning'].filter(Boolean).join(' '),
+        },
+      })
+
+      expect(result.stderr).toBe('')
+      expect(JSON.parse(result.stdout)).toMatchObject({
+        first: { output: 'FIRST_OK' },
+        second: { output: 'SECOND_OK' },
+      })
+      expect(server.requests).toHaveLength(2)
+      const messages = server.requests[1]?.messages
+      expect(Array.isArray(messages) ? messages.slice(-3) : messages).toEqual([
+        { role: 'user', content: 'first question' },
+        { role: 'assistant', content: 'FIRST_OK', reasoning_content: 'retained thought' },
+        { role: 'user', content: 'follow-up question' },
+      ])
     } finally {
       await server.close()
     }

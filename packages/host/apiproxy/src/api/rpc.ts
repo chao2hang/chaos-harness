@@ -98,6 +98,12 @@ export interface RpcErrorDetailsMap {
   'subagent-not-resumable': { childSessionId: SessionId }
   'subagent-unauthorized': { childSessionId: SessionId }
   'subagent-delivery-unavailable': { childSessionId: SessionId }
+  /**
+   * `host.restart` was asked of a deployment whose launcher provides no
+   * process-replacement request, so nothing could start a successor. The
+   * message names what this build would need to serve it.
+   */
+  'restart-unavailable': {}
   'internal': {}
 }
 

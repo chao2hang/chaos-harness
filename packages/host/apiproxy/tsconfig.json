@@ -78,6 +78,9 @@
       "path": "../../jobs/jobs"
     },
     {
+      "path": "../../boot/cmdline"
+    },
+    {
       "path": "../../interaction/commands"
     },
     {
