@@ -12,32 +12,15 @@ DeepSeek Harness 目前处于 _开发者预览_ 阶段，正在快速迭代。**
 
 ## 运行
 
-### 从 GitHub Releases 安装
+### 通过 `npm` 运行
 
-安装 [Node.js 22.19 或更高版本](https://nodejs.org/)，然后从 GitHub 下载最新的自包含版本：
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/scripts/install.mjs | node --input-type=module
-dsh web
-```
-
-安装器会使用 Release 中的 `SHA256SUMS` 校验归档，将程序安装到 `~/.local/share/dsh`，并把启动器放到 `~/.local/bin`；整个安装过程不会访问 npmjs。可通过 `DSH_VERSION` 安装指定版本，也可通过 `DSH_INSTALL_DIR` 和 `DSH_BIN_DIR` 指定其他目录。
-
-Windows 用户可在 PowerShell 中运行等效命令；启动器将安装到 `%LOCALAPPDATA%\DeepSeek Harness\bin`：
-
-```powershell
-irm https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/scripts/install.mjs | node --input-type=module
-dsh web
-```
-
-`dsh web` 会启动 Web UI，默认地址为 `http://127.0.0.1:3080`。通过反向代理部署远程 HTTPS 时，请配置访问令牌和公网地址：
+安装 `Node.js`，然后运行：
 
 ```sh
-export DSH_WEB_TOKEN='replace-with-a-random-token'
-dsh web --host 0.0.0.0 --auth required --public-url https://dsh.example.com
+npx @deepseek-ai/dsh web
 ```
 
-TLS 与部署参数详见 [Web UI 指南](docs/user/guide/index.md)。
+该命令默认会在 `http://127.0.0.1:3080` 启动 Web UI，本机启动时还会用默认浏览器打开页面。通过 SSH 启动时只打印宿主机 URL，因为本地转发地址由 SSH 客户端或编辑器持有。传入 `--no-open` 可仅运行服务器而不打开浏览器。详见 [Web UI 指南](docs/user/guide/index.md)。
 
 ### 从源码运行
 
@@ -50,6 +33,8 @@ pnpm install
 pnpm run build
 pnpm dsh web
 ```
+
+`pnpm run build` 会准备仓库产物。`pnpm dsh web` 会直接使用这些已构建产物，不会重新构建。
 
 ## 社区与支持
 
@@ -67,9 +52,9 @@ pnpm dsh web
   </thead>
   <tbody>
     <tr>
-      <td align="center"><img src="assets/community-wecom-assistant.png" alt="DeepSeek Harness 企微小助手二维码" width="180" height="180"></td>
-      <td align="center"><a href="https://trtgsjkv6r.feishu.cn/share/base/form/shrcnIt5twSVdLGD52KJBckGCgg"><img src="assets/community-wecom-survey.png" alt="DeepSeek Harness 入群问卷二维码" width="180" height="180"></a></td>
-      <td align="center"><img src="assets/community-wechat-official-account.png" alt="DeepSeek Harness 团队微信公众号二维码" width="180" height="180"></td>
+      <td align="center"><img src="https://cdn.deepseek.com/harness/readme/community-wecom-assistant.png" alt="DeepSeek Harness 企微小助手二维码" width="180" height="180"></td>
+      <td align="center"><a href="https://trtgsjkv6r.feishu.cn/share/base/form/shrcnIt5twSVdLGD52KJBckGCgg"><img src="https://cdn.deepseek.com/harness/readme/community-wecom-survey.png" alt="DeepSeek Harness 入群问卷二维码" width="180" height="180"></a></td>
+      <td align="center"><img src="https://cdn.deepseek.com/harness/readme/community-wechat-official-account.png" alt="DeepSeek Harness 团队微信公众号二维码" width="180" height="180"></td>
     </tr>
   </tbody>
 </table>

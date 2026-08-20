@@ -8,12 +8,11 @@
  * client half (see the contract module doc). Export discipline:
  * packages/client/AGENTS.md.
  */
+import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-// Type-only: pulls ui-layout's Context merge (ctx.layout) for the drawer dismissal below.
-import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from './contract/slots.ts'
 import { createWorkspaceViewStore } from './stores.ts'
 import { WorkspaceBrowser } from './WorkspaceBrowser.tsx'
@@ -44,7 +43,7 @@ const NS = 'workspace'
  * provides a waitable service. apply therefore depends on each slot
  * declaration through `slots.inject()` instead of assuming order.
  */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'layout']
+export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'connection']
 
 /**
  * Register the browser and picker once their slot declarations are on the
@@ -53,6 +52,8 @@ export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'layout']
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
+  const connection = ctx.get('connection') as ConnectionHandle
+  const hostDescription = connection.hostDescription
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-workspace: dictionaries')
 
   const searchSessions: WorkspaceBrowserInjected['searchSessions'] = async (query, signal) => {
@@ -72,11 +73,8 @@ export function apply(ctx: ClientContext): void {
   const browserInjected = (): WorkspaceBrowserInjected => ({
     // Explicit group actions keep their target; unscoped New Session inherits
     // the current Session Workspace before the recent-Workspace fallback.
-    // Opening a session from the browser is a navigation gesture: on a phone
-    // the browser itself is the overlay drawer covering the conversation it
-    // just selected, so the same gesture dismisses it.
-    startSession: (workspaceId) => { ctx.workspaces.startSession(workspaceId); ctx.layout.dismissDrawer() },
-    open: (sessionId) => { ctx.sessions.open(sessionId); ctx.layout.dismissDrawer() },
+    startSession: (workspaceId) => { ctx.workspaces.startSession(workspaceId) },
+    open: (sessionId) => { ctx.sessions.open(sessionId) },
     searchSessions,
     searchResultLimit: ctx.sessions.searchResultLimit,
     renameSession: async (sessionId, title) => {
@@ -89,7 +87,7 @@ export function apply(ctx: ClientContext): void {
     },
     forkSession: (sessionId) => {
       ctx.sessions.fork({ sessionId, increaseTitle: true })
-        .then((childId) => { ctx.sessions.open(childId); ctx.layout.dismissDrawer() })
+        .then((childId) => { ctx.sessions.open(childId) })
         .catch(() => {
           // Fork or child-rename failure keeps the current selection.
         })
@@ -104,7 +102,7 @@ export function apply(ctx: ClientContext): void {
       await ctx.workspaces.insertSessionBefore(workspaceId, sessionId, beforeSessionId)
     },
     createWorkspace: input => ctx.workspaces.create(input),
-    hooks: { directoryFlow: browserFlowSource },
+    hooks: { directoryFlow: browserFlowSource, hostDescription },
   })
   const pickerInjected = (): WorkspacePickerInjected => ({
     createWorkspace: input => ctx.workspaces.create(input),

@@ -12,32 +12,15 @@ DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. *
 
 ## Run
 
-### Install from GitHub Releases
+### Run from `npm`
 
-Install [Node.js 22.19 or newer](https://nodejs.org/), then download the latest self-contained release from GitHub:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/scripts/install.mjs | node --input-type=module
-dsh web
-```
-
-The installer verifies the archive against the release's `SHA256SUMS`, installs it under `~/.local/share/dsh`, and places the launcher in `~/.local/bin`. It never contacts npmjs. Set `DSH_VERSION` to install a specific version or `DSH_INSTALL_DIR` and `DSH_BIN_DIR` to choose other locations.
-
-On Windows, run the equivalent command in PowerShell; the launcher is installed under `%LOCALAPPDATA%\DeepSeek Harness\bin`:
-
-```powershell
-irm https://raw.githubusercontent.com/deepseek-ai/deepseek-harness/master/scripts/install.mjs | node --input-type=module
-dsh web
-```
-
-`dsh web` starts the Web UI, served at `http://127.0.0.1:3080` by default. For a remote HTTPS deployment behind a reverse proxy, configure an access token and its public URL:
+Install `Node.js`, then run:
 
 ```sh
-export DSH_WEB_TOKEN='replace-with-a-random-token'
-dsh web --host 0.0.0.0 --auth required --public-url https://dsh.example.com
+npx @deepseek-ai/dsh web
 ```
 
-See the [Web UI guide](docs/user/guide/index.md) for TLS and deployment options.
+The command starts the Web UI at `http://127.0.0.1:3080` by default and opens it in the default browser for a local launch. An SSH launch only prints the host URL because the SSH client or editor owns the local forwarded address. Pass `--no-open` to run the server without opening a browser. See [Web UI guide](docs/user/guide/index.md).
 
 ### Run from source
 
@@ -50,6 +33,8 @@ pnpm install
 pnpm run build
 pnpm dsh web
 ```
+
+`pnpm run build` prepares the repository artifacts. `pnpm dsh web` uses those built artifacts without rebuilding.
 
 ## Community and support
 

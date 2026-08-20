@@ -108,11 +108,12 @@ export class FakeApiClient implements IApiClient {
     version: string
     cwd: string
     attachedSessions: number
+    home: string
     canOpenPath: boolean
     canRestart: boolean
   }>> =
     () => Promise.resolve(ok({
-      version: '0-fake', cwd: '/f', attachedSessions: 0, canOpenPath: true, canRestart: true,
+      version: '0-fake', cwd: '/f', attachedSessions: 0, home: '/h', canOpenPath: true, canRestart: true,
     }))
   onRestart: (payload: unknown) => Promise<RpcResponse<{ restarting: true }>> =
     () => Promise.resolve(ok({ restarting: true as const }))

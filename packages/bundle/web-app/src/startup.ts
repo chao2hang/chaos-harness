@@ -1,6 +1,6 @@
 /**
  * The web app's command-line provider: it parses the `dsh --profile web` flag
- * family (`--host`, `--port`, `--trusted-host`, and deployment flags) and its `--help`
+ * family (`--host`, `--port`, `--trusted-host`, `--auth`, `--no-open`, and deployment flags) and its `--help`
  * text, then provides the immutable values as {@link WEB_STARTUP_SERVICE}.
  * Ordinary rows inject that service before reading it from lazy config.
  * @module @deepseek-ai/dsh-web-app/startup
@@ -26,6 +26,8 @@ export type WebAuthMode = 'off' | 'required'
 export interface WebStartupValues {
   /** Authentication policy selected by `--auth`; defaults to `off`. */
   auth: WebAuthMode
+  /** Whether this invocation opens the default browser after startup. */
+  openBrowser: boolean
   /** `--host`, absent when the invocation did not name one. */
   host?: string
   /** `--port`, absent when the invocation did not name one. */
@@ -44,6 +46,7 @@ export interface WebStartupValues {
 interface WebOptions {
   auth: string
   host?: string
+  open: boolean
   port?: string
   publicUrl?: string
   tlsCert?: string
@@ -68,6 +71,7 @@ function webCommand(): Command {
     .helpOption('-h, --help', 'show this help')
     .option('--auth <mode>', 'authentication policy (off or required)', 'off')
     .option('--host <host>', 'bind host')
+    .option('--no-open', 'do not open the Web UI in the default browser')
     .option('--port <port>', 'listen port; pass 0 to let the OS pick a free one')
     .option('--public-url <https URL>', 'external HTTPS URL when TLS terminates at a reverse proxy')
     .option('--tls-cert <path>', 'built-in HTTPS certificate path')
@@ -76,6 +80,7 @@ function webCommand(): Command {
     .addHelpText('after', `
 Examples:
   dsh --profile web                          serve on the composed host and port
+  dsh --profile web --no-open                serve without opening a browser
   dsh --profile web --port 8080              serve on another port
 `)
 }
@@ -120,6 +125,7 @@ export function apply(ctx: Context): void {
     }
     ctx.provide(WEB_STARTUP_SERVICE, {
       auth,
+      openBrowser: options.open,
       ...options.host !== undefined && { host: options.host },
       ...options.port !== undefined && { port: Number(options.port) },
       ...options.publicUrl !== undefined && { publicUrl: options.publicUrl },

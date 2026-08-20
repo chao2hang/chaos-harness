@@ -57,6 +57,7 @@ export const apply = ctx => globalThis.__webStartupApply(ctx)
     '  config:',
     '    auth: !!js ctx.webStartup.auth',
     "    host: !!js ctx.webStartup.host ?? '127.0.0.1'",
+    '    openBrowser: !!js ctx.webStartup.openBrowser',
     '    port: !!js ctx.webStartup.port ?? 3080',
     '    publicUrl: !!js ctx.webStartup.publicUrl',
     '    tlsCert: !!js ctx.webStartup.tlsCert',
@@ -93,6 +94,7 @@ describe('web command-line provider', () => {
   it('publishes each flag and releases direct service expressions', async () => {
     const { values, observed } = await bootProvider([
       '--host', '127.0.0.1',
+      '--no-open',
       '--port', '8080',
       '--trusted-host', 'lab.internal', 'lab-2.internal',
       '--trusted-host', '10.0.0.9',
@@ -104,6 +106,7 @@ describe('web command-line provider', () => {
     expect(values).toEqual({
       auth: 'required',
       host: '127.0.0.1',
+      openBrowser: false,
       port: 8080,
       publicUrl: 'https://dsh.example.test',
       tlsCert: 'cert.pem',
@@ -116,10 +119,11 @@ describe('web command-line provider', () => {
 
   it('leaves deployment values to each consumer when flags omit them', async () => {
     const { values, observed } = await bootProvider([])
-    expect(values).toEqual({ auth: 'off', trustedHosts: [] })
+    expect(values).toEqual({ auth: 'off', openBrowser: true, trustedHosts: [] })
     expect(observed.readerConfig).toEqual({
       auth: 'off',
       host: '127.0.0.1',
+      openBrowser: true,
       port: 3080,
       trustedHosts: [],
     })
@@ -128,6 +132,7 @@ describe('web command-line provider', () => {
   it('prints its own help and leaves the consumer pending', async () => {
     const { values, observed } = await bootProvider(['--help'])
     expect(observed.out).toContain('dsh --profile web')
+    expect(observed.out).toContain('--no-open')
     expect(observed.out).toContain('--trusted-host')
     expect(values).toBeUndefined()
     expect(observed.readerConfig).toBeUndefined()

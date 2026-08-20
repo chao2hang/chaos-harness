@@ -2,15 +2,10 @@ import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceBrowserInjected, WorkspacePickerInjected } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { WorkspaceBrowser } from '../src/client/WorkspaceBrowser.tsx'
 import { WorkspacePicker } from '../src/client/WorkspacePicker.tsx'
-
-// The service reads its initial locale from the browser; these specs assert
-// the shipped Chinese copy, so they state the browser they assume.
-usePinnedBrowserLanguages('zh-CN')
 
 async function bench() {
   const ctx = new Context()
@@ -36,15 +31,18 @@ async function bench() {
     create, startSession, rename, insertSessionBefore,
   } as never)
   ctx.provide('sessions', { open, clear, search, searchResultLimit: 20, binding, fork } as never)
-  // Opening or starting a session is a navigation gesture, so the browser's
-  // callbacks also dismiss the phone drawer through the layout face.
-  const dismissDrawer = vi.fn()
-  ctx.provide('layout', { dismissDrawer } as never)
+  ctx.provide('connection', {
+    hostDescription: { getSnapshot: () => undefined, subscribe: () => () => {} },
+  } as never)
   const locale = new LocaleRuntime(ctx)
+  // These specs assert the shipped Chinese copy. There is no jsdom `window`
+  // in this lane, so browser-language detection never runs and the locale
+  // comes from FALLBACK_LOCALE (en): state the asserted locale explicitly.
+  locale.setLocale('zh')
   ctx.provide('locale', locale)
   return {
     ctx, slots: ctx.get('slots') as SlotRegistry, locale, create, startSession, rename,
-    insertSessionBefore, open, clear, search, renameSession, binding, fork, dismissDrawer,
+    insertSessionBefore, open, clear, search, renameSession, binding, fork,
   }
 }
 
@@ -58,7 +56,7 @@ function declare(slots: SlotRegistry, ...names: HoleName[]): () => void {
 
 describe('ui-workspace apply', () => {
   it('declares the services it drives', () => {
-    expect(inject).toEqual(['slots', 'sessions', 'workspaces', 'locale', 'layout'])
+    expect(inject).toEqual(['slots', 'sessions', 'workspaces', 'locale', 'connection'])
   })
 
   it('registers browser and pickers for declarations arriving before or after apply', async () => {
@@ -92,8 +90,6 @@ describe('ui-workspace apply', () => {
     expect(b.startSession).toHaveBeenLastCalledWith(undefined)
     browser.open('session' as never)
     expect(b.open).toHaveBeenCalledWith('session')
-    // Every navigating verb also dismisses the phone drawer it was tapped in.
-    expect(b.dismissDrawer).toHaveBeenCalledTimes(3)
     const signal = new AbortController().signal
     await expect(browser.searchSessions('match', signal)).resolves.toEqual({
       items: [{ sessionId: 'session', snippet: 'match' }],
@@ -109,7 +105,6 @@ describe('ui-workspace apply', () => {
       expect(b.open).toHaveBeenCalledWith('forked')
     })
     expect(b.fork).toHaveBeenCalledWith({ sessionId: 'session', increaseTitle: true })
-    expect(b.dismissDrawer).toHaveBeenCalledTimes(4)
     await browser.renameWorkspace('ws' as never, 'renamed')
     expect(b.rename).toHaveBeenCalledWith('ws', 'renamed')
     await browser.insertSessionBefore('ws' as never, 's1' as never, 's2' as never)
@@ -133,6 +128,7 @@ describe('ui-workspace apply', () => {
     const browser = (b.slots.entries('sidebar.workspaces')[0]!.inject as () => WorkspaceBrowserInjected)()
     const picker = (b.slots.entries('conversation.hero.workspace')[0]!.inject as () => WorkspacePickerInjected)()
     expect(browser.hooks.directoryFlow.getSnapshot()).toBe(false)
+    expect(browser.hooks.hostDescription.getSnapshot()).toBeUndefined()
     expect(picker.hooks.directoryFlow.getSnapshot()).toBe(false)
     // A flow occupant flips exactly its own surface, and the source notifies.
     const notified = vi.fn()
