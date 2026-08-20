@@ -2524,6 +2524,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
     host: {
       describe: request => ok(request, {
         version: '0.0.0-fixture', cwd: '/tmp/fixture', attachedSessions, canOpenPath: true,
+        canRestart: true,
       }),
       // Deterministic native pick: the keyless lanes drive the full
       // pick-then-adopt path without an OS chooser (design-mock content,
@@ -2562,6 +2563,11 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         return ok(request, { path: target })
       },
       openPath: request => ok(request, { opened: true as const }),
+      // The acknowledgement is the whole observable half of a real restart —
+      // everything after it is the process going away, which a fixture with no
+      // process cannot reproduce. A caller therefore stays in its waiting
+      // state here, which is the honest fixture outcome.
+      restart: request => ok(request, { restarting: true as const }),
     },
     workspace: {
       list: request => ok(request, {
@@ -3098,6 +3104,7 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'host.listDirectory': return this.api.host.listDirectory(request, new AbortController().signal)
       case 'host.createDirectory': return this.api.host.createDirectory(request)
       case 'host.openPath': return this.api.host.openPath(request, new AbortController().signal)
+      case 'host.restart': return this.api.host.restart(request)
       case 'workspace.list': return this.api.workspace.list(request)
       case 'workspace.create': return this.api.workspace.create(request)
       case 'workspace.rename': return this.api.workspace.rename(request)

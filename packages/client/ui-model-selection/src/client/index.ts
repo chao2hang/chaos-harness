@@ -166,7 +166,12 @@ export function apply(ctx: ClientContext): void {
           load: () => {
             if (available) directory.load().catch(() => { /* surfaced on the store */ })
           },
-          select: (selection: ModelSelection) => available
+          select: (selection: ModelSelection & {
+            contextWindow?: number
+            maxTokens?: number
+            imageInput?: boolean
+            enableReasoning?: true
+          }) => available
             ? directory.select(selection).then(() => true, () => false)
             : Promise.resolve(false),
         }

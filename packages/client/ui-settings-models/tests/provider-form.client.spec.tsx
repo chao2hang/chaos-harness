@@ -17,6 +17,18 @@ afterEach(cleanup)
 const t: ModelsSectionInjected['t'] = key => en[key]
 
 const PROTOCOLS = ['openai-completions', 'openai-responses', 'anthropic-messages']
+const DEFAULT_CUSTOM_CAPABILITIES = {
+  input: ['text', 'image'],
+  reasoningEfforts: {
+    off: null,
+    minimal: 'minimal',
+    low: 'low',
+    medium: 'medium',
+    high: 'high',
+    xhigh: 'xhigh',
+    max: 'max',
+  },
+}
 
 /** The pi-ai profile shape as the host serializes it, including the layer-1 fields. */
 const PiAiConfig = Schema.object({
@@ -31,6 +43,8 @@ const PiAiConfig = Schema.object({
       name: Schema.string(),
       contextWindow: Schema.number(),
       maxTokens: Schema.number(),
+      input: Schema.array(Schema.union(['text', 'image'])),
+      reasoningEfforts: Schema.union([Schema.const(false), Schema.dict(Schema.union([Schema.string(), Schema.const(null)]))]),
     })),
     reasoning: Schema.union(['off', 'high']),
   })),
@@ -213,6 +227,30 @@ describe('model list editing', () => {
     })
   })
 
+  it('defaults a new custom model to image input and standard reasoning, then allows narrowing both', async () => {
+    const { mutate } = await mountSection()
+    openEditor('openai')
+
+    fireEvent.click(screen.getByRole('button', { name: en.addModel }))
+    fireEvent.change(screen.getByLabelText(`${en.modelId} 1`), { target: { value: 'capable' } })
+    expandModel(1)
+    const images = screen.getByLabelText<HTMLInputElement>(`${en.modelImageInput} 1`)
+    const reasoning = screen.getByLabelText<HTMLSelectElement>(`${en.modelReasoning} 1`)
+    expect(images.checked).toBe(true)
+    expect(reasoning.value).toBe('standard')
+
+    fireEvent.click(images)
+    fireEvent.change(reasoning, { target: { value: 'deepseek' } })
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{
+      id: 'capable',
+      input: ['text'],
+      reasoningEfforts: { off: null, high: 'high', max: 'max' },
+    }])
+  })
+
   it('names a duplicate model id in the edit flow too', async () => {
     const { mutate } = await mountSection({
       providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'dup' }] } },
@@ -249,7 +287,7 @@ describe('model list editing', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     // What lands in settings is always a plain token count.
     expect(firstMutate(mutate).ops[0]?.value)
-      .toEqual([{ id: 'm', contextWindow: 1_000_000, maxTokens: 1000 }])
+      .toEqual([{ id: 'm', contextWindow: 1_000_000, maxTokens: 1000, ...DEFAULT_CUSTOM_CAPABILITIES }])
   })
 
   it('refuses to apply while a capacity is unreadable', async () => {
@@ -484,7 +522,7 @@ describe('endpoint interrogation', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops[0]?.value).toEqual([
       { id: 'kept', contextWindow: 111 },
-      { id: 'fresh', contextWindow: 4096, name: 'Fresh' },
+      { id: 'fresh', contextWindow: 4096, name: 'Fresh', ...DEFAULT_CUSTOM_CAPABILITIES },
     ])
   })
 
@@ -601,7 +639,10 @@ describe('endpoint interrogation', () => {
 
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     // A disclosed output cap rides along with the candidate that has one.
-    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'a' }, { id: 'b', maxTokens: 2048 }])
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([
+      { id: 'a', ...DEFAULT_CUSTOM_CAPABILITIES },
+      { id: 'b', maxTokens: 2048, ...DEFAULT_CUSTOM_CAPABILITIES },
+    ])
   })
 })
 
@@ -698,7 +739,7 @@ describe('hand-declared providers', () => {
           apiKeyEnv: 'ACME_GATEWAY_API_KEY',
           api: 'openai-completions',
           baseURL: 'https://gateway.acme.example/v1',
-          models: [{ id: 'acme-large', contextWindow: 65_536 }],
+          models: [{ id: 'acme-large', contextWindow: 65_536, ...DEFAULT_CUSTOM_CAPABILITIES }],
         },
       }],
       // The section this card was drafted over: a route another tab declared
@@ -709,11 +750,8 @@ describe('hand-declared providers', () => {
   })
 
   it('scopes each card to fields a provider can actually own', async () => {
-    // Reasoning effort is a per-MODEL capability and the
-    // models under one provider disagree about it, so a provider-scoped
-    // control could only be set to a value some of them reject — which would
-    // take the whole provider out of the picker. The composer's model picker
-    // owns the choice, and a switch there records provider+model+effort together.
+    // Reasoning and image input stay on each model row; the provider fields do
+    // not claim one capability shared by models that may disagree.
     const fields = () => [...document.querySelectorAll('input,select')]
       .map(el => el.getAttribute('aria-label')).filter(Boolean)
 
@@ -1153,7 +1191,7 @@ describe('hand-declared providers', () => {
     expect(firstMutate(mutate).ops[0]?.value).toEqual({
       api: 'anthropic-messages',
       baseURL: 'https://acme.test/v1',
-      models: [{ id: 'm' }],
+      models: [{ id: 'm', ...DEFAULT_CUSTOM_CAPABILITIES }],
     })
   })
 

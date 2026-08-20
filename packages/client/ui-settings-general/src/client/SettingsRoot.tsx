@@ -14,7 +14,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
   IconAgentPresetOutline16, IconCloseOutline16, IconDataOutline16,
-  IconPersonalizationOutline16, IconSettingsOutline16,
+  IconPersonalizationOutline16, IconRefreshOutline16, IconSettingsOutline16, Portal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsRootComponentProps, SettingsSectionRow } from './shell-contract.ts'
 import css from './SettingsRoot.module.css'
@@ -24,6 +24,7 @@ function navIcon(id: string) {
   if (id === 'models') return <IconDataOutline16 className={css.navIcon} size={16} />
   if (id === 'agent-presets') return <IconAgentPresetOutline16 className={css.navIcon} size={16} />
   if (id === 'plugins') return <IconPersonalizationOutline16 className={css.navIcon} size={16} />
+  if (id === 'maintenance') return <IconRefreshOutline16 className={css.navIcon} size={16} />
   return <IconSettingsOutline16 className={css.navIcon} size={16} />
 }
 
@@ -59,40 +60,42 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
   useEffect(() => { closeButton.current?.focus() }, [])
 
   return (
-    <div className={css.overlay} role="presentation">
-      <div className={css.mask} aria-hidden="true" onClick={onClose} />
-      <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <nav className={css.nav}>
-          <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
-          <div className={css.navList}>
-            {rows.map(row => (
-              <button
-                key={row.id}
-                type="button"
-                className={clsx(css.navCell, row.id === active && css.active)}
-                aria-current={row.id === active ? 'true' : undefined}
-                onClick={() => { onSelect(row.id) }}
-              >
-                {navIcon(row.id)}
-                <span className={css.navLabel}>{row.label}</span>
+    <Portal>
+      <div className={css.overlay} role="presentation">
+        <div className={css.mask} aria-hidden="true" onClick={onClose} />
+        <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+          <nav className={css.nav}>
+            <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
+            <div className={css.navList}>
+              {rows.map(row => (
+                <button
+                  key={row.id}
+                  type="button"
+                  className={clsx(css.navCell, row.id === active && css.active)}
+                  aria-current={row.id === active ? 'true' : undefined}
+                  onClick={() => { onSelect(row.id) }}
+                >
+                  {navIcon(row.id)}
+                  <span className={css.navLabel}>{row.label}</span>
+                </button>
+              ))}
+            </div>
+          </nav>
+          <div className={css.content}>
+            <div className={css.header}>
+              <div className={css.actions}>{renderSlot('settings.action', {})}</div>
+              <button ref={closeButton} type="button" className={css.close} onClick={onClose}>
+                <IconCloseOutline16 size={14} />
+                <span className={css.hiddenLabel}>{renderSlot('settings.close', {})}</span>
               </button>
-            ))}
-          </div>
-        </nav>
-        <div className={css.content}>
-          <div className={css.header}>
-            <div className={css.actions}>{renderSlot('settings.action', {})}</div>
-            <button ref={closeButton} type="button" className={css.close} onClick={onClose}>
-              <IconCloseOutline16 size={14} />
-              <span className={css.hiddenLabel}>{renderSlot('settings.close', {})}</span>
-            </button>
-          </div>
-          <div className={css.options}>
-            {active !== undefined && renderSlot('settings.section', { close: onClose }, { only: active })}
+            </div>
+            <div className={css.options}>
+              {active !== undefined && renderSlot('settings.section', { close: onClose }, { only: active })}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Portal>
   )
 }
 

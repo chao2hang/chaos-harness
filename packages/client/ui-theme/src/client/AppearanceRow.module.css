@@ -55,3 +55,15 @@
   background: var(--dsw-alias-bg-module-platform);
   border-color: var(--dsw-static-neutral-bluish-400);
 }
+
+/* Phone settings sheet (SettingsRoot's breakpoint): the 180px basis exceeds a
+   third of the sheet width, so every cube wrapped onto its own row and the
+   three-way choice cost ~330px of a scarce column. Equal shares of one row
+   restore the intended shape. */
+@media (max-width: 600px) {
+  .themeCube {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 12px 4px;
+  }
+}

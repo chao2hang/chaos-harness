@@ -77,6 +77,8 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * gap and a brief overshoot survivable; coming back cancels the close.
  * @param props.dense - reduce vertical row spacing without changing the standard typography or card width.
  * @param props.compact - use reduced menu typography and spacing.
+ * @param props.mobileSheet - on narrow viewports, present the menu and its
+ * mask as a safe-area-aware bottom sheet; portal mode attaches both to body.
  * @param props.getAnchorRect - portal mode only: supply the anchor rect
  * directly (e.g. from a host-owned trigger button) instead of measuring the
  * Menu's own wrapper span. Required when the wrapper isn't itself laid out at
@@ -87,7 +89,7 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
  * by a hairline; they stay visible while the items above scroll.
  * @returns anchor wrapper with the conditional list.
  */
-export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, getAnchorRect, footer, className }: {
+export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, onClose, align = 'start', side = 'bottom', portal = false, closeOnPointerLeave = false, dense = false, compact = false, mobileSheet = false, getAnchorRect, footer, className }: {
   open: boolean
   anchor: ReactNode
   items: readonly MenuEntry[]
@@ -102,6 +104,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   closeOnPointerLeave?: boolean
   dense?: boolean
   compact?: boolean
+  mobileSheet?: boolean
   getAnchorRect?: () => DOMRect | null
   className?: string
 }) {
@@ -265,7 +268,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   const list = open && (
     <div
       ref={listRef}
-      className={clsx(css.list, dense && css.denseList, compact && css.compactList, scrollable && css.scrollable, portal && css.portal, side === 'top' && !portal && css.sideTop, align === 'end' && !portal && css.alignEnd)}
+      className={clsx(css.list, dense && css.denseList, compact && css.compactList, mobileSheet && css.mobileSheet, scrollable && css.scrollable, portal && css.portal, side === 'top' && !portal && css.sideTop, align === 'end' && !portal && css.alignEnd)}
       style={portal ? fixedPos ?? MEASURE_STYLE : undefined}
       role="menu"
       // React portals bubble synthetic events through the REACT tree: without
@@ -288,6 +291,9 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
   // enter/leave traversal runs over the React tree, so trigger and portaled
   // list are one region here. Aiming back at the trigger, or crossing the 4px
   // gap between them, therefore never counts as leaving.
+  const mobileScrim = mobileSheet && open
+    ? <div className={css.mobileScrim} aria-hidden="true" onClick={onClose} />
+    : null
   return (
     <span
       ref={rootRef}
@@ -295,6 +301,9 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       onPointerEnter={closeOnPointerLeave ? cancelClose : undefined}
       onPointerLeave={closeOnPointerLeave ? () => { if (open) armClose() } : undefined}
     >
+      {portal
+        ? (mobileScrim !== null ? createPortal(mobileScrim, document.body) : null)
+        : mobileScrim}
       {anchor}
       {portal ? (list !== false && createPortal(list, document.body)) : list}
     </span>

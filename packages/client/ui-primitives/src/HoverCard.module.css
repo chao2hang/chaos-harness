@@ -52,3 +52,12 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+/* A hover preview needs a pointer that can hover. On touch the tap that opens
+   a row also enters it, so the card appeared over the content the tap
+   navigated to, with no pointer-leave to dismiss it. */
+@media (hover: none) {
+  .card {
+    display: none;
+  }
+}

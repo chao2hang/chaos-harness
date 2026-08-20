@@ -91,7 +91,12 @@ export class ModelDirectory {
    * each entry's own retry surface engages.
    * @param selection - provider, provider-owned model id, and optional adapter-owned effort.
  */
-  async select(selection: ModelSelection): Promise<void> {
+  async select(selection: ModelSelection & {
+    contextWindow?: number
+    maxTokens?: number
+    imageInput?: boolean
+    enableReasoning?: true
+  }): Promise<void> {
     this.assertAvailable()
     const generation = ++this.generation
     this.store.update((s) => { s.status = 'selecting'; s.error = null })
@@ -102,6 +107,10 @@ export class ModelDirectory {
       ...selection.reasoningEffort === undefined
         ? {}
         : { reasoningEffort: selection.reasoningEffort },
+      ...selection.contextWindow === undefined ? {} : { contextWindow: selection.contextWindow },
+      ...selection.maxTokens === undefined ? {} : { maxTokens: selection.maxTokens },
+      ...selection.imageInput === undefined ? {} : { imageInput: selection.imageInput },
+      ...selection.enableReasoning === undefined ? {} : { enableReasoning: selection.enableReasoning },
     })
     if (this.disposed || generation !== this.generation) {
       if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)

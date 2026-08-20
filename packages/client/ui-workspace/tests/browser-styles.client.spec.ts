@@ -11,15 +11,48 @@ const css = readFileSync(fileURLToPath(new URL('../src/client/WorkspaceBrowser.m
 const rowsCss = readFileSync(fileURLToPath(new URL('../src/client/rows/Rows.module.css', import.meta.url)), 'utf8')
 
 /**
+ * Split a stylesheet into the rules written at top level and the body of each
+ * at-rule block, keyed by prelude. Without the split a conditional override
+ * merges into its own base rule and the base value becomes unassertable.
+ * @param source - stylesheet text.
+ * @returns top-level text plus each at-rule body by prelude.
+ */
+function segmentsOf(source: string): { top: string; atRules: Map<string, string> } {
+  const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, ' ')
+  const atRules = new Map<string, string>()
+  let top = ''
+  let cursor = 0
+  while (cursor < withoutComments.length) {
+    const at = withoutComments.indexOf('@', cursor)
+    if (at === -1) { top += withoutComments.slice(cursor); break }
+    top += withoutComments.slice(cursor, at)
+    const open = withoutComments.indexOf('{', at)
+    if (open === -1) { top += withoutComments.slice(at); break }
+    let depth = 0
+    let end = open
+    for (; end < withoutComments.length; end += 1) {
+      if (withoutComments[end] === '{') depth += 1
+      else if (withoutComments[end] === '}' && (depth -= 1) === 0) break
+    }
+    atRules.set(withoutComments.slice(at, open).trim(), withoutComments.slice(open + 1, end))
+    cursor = end + 1
+  }
+  return { top, atRules }
+}
+
+/**
  * Declarations of one selector rule, keyed by property with whitespace collapsed.
  * Declaration order and trailing semicolons are normalized away.
+ * @param source - stylesheet text.
  * @param selector - one exact selector, including a leading dot for local classes.
+ * @param atRule - at-rule prelude to read inside; omit for the top-level rules.
  * @returns the rule's declarations, or undefined when no such rule exists.
  */
-function declarationsFrom(source: string, selector: string): Map<string, string> | undefined {
-  const withoutComments = source.replace(/\/\*[\s\S]*?\*\//g, ' ')
+function declarationsFrom(source: string, selector: string, atRule?: string): Map<string, string> | undefined {
+  const { top, atRules } = segmentsOf(source)
+  const scope = atRule === undefined ? top : atRules.get(atRule) ?? ''
   const found = new Map<string, string>()
-  for (const [, selectorList = '', body = ''] of withoutComments.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const [, selectorList = '', body = ''] of scope.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!selectorList.split(',').map(value => value.trim()).includes(selector)) continue
     for (const part of body.split(';')) {
       const colon = part.indexOf(':')
@@ -30,8 +63,13 @@ function declarationsFrom(source: string, selector: string): Map<string, string>
   return found.size === 0 ? undefined : found
 }
 
-const declarations = (selector: string): Map<string, string> | undefined => declarationsFrom(css, selector)
-const rowDeclarations = (selector: string): Map<string, string> | undefined => declarationsFrom(rowsCss, selector)
+/** Phone breakpoint the touch-sizing overrides are written under. */
+const TOUCH = '@media (max-width: 640px)'
+
+const declarations = (selector: string, atRule?: string): Map<string, string> | undefined =>
+  declarationsFrom(css, selector, atRule)
+const rowDeclarations = (selector: string, atRule?: string): Map<string, string> | undefined =>
+  declarationsFrom(rowsCss, selector, atRule)
 
 describe('WorkspaceBrowser.module.css list', () => {
   const root = declarations('.root')
@@ -112,5 +150,21 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(declarations('.rail .sectionHeader')?.get('justify-content')).toBe('flex-start')
     expect(declarations('.rail .iconButton')?.get('width')).toBe('36px')
     expect(declarations('.rail .search')?.get('width')).toBe('36px')
+  })
+
+  it('gives the phone drawer touch-sized rows and header controls', () => {
+    expect(rowDeclarations('.projectRow', TOUCH)?.get('height')).toBe('44px')
+    expect(rowDeclarations('.sessionRow', TOUCH)?.get('height')).toBe('44px')
+    expect(rowDeclarations('.iconButton', TOUCH)?.get('height')).toBe('32px')
+    expect(declarations('.iconButton', TOUCH)?.get('height')).toBe('40px')
+    // The collapsed search wrapper clips its button, so it grows with it.
+    expect(declarations('.search', TOUCH)?.get('height')).toBe('40px')
+    expect(declarations('.sectionHeader', TOUCH)?.get('height')).toBe('44px')
+  })
+
+  it('keeps the hover-only row verbs reachable without a hovering pointer', () => {
+    const noHover = '@media (hover: none)'
+    expect(rowDeclarations('.sessionRow .rowActions', noHover)?.get('display')).toBe('inline-flex')
+    expect(rowDeclarations('.sessionRow .time', noHover)?.get('display')).toBe('none')
   })
 })

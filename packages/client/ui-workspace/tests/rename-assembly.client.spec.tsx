@@ -33,6 +33,8 @@ async function createRuntime(): Promise<SlotTestRuntime> {
   const runtime = await SlotTestRuntime.create()
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.provide('locale', locale)
+  // The browser's navigating verbs dismiss the phone drawer through the layout face.
+  runtime.provide('layout', { dismissDrawer: () => {} } as never)
   runtime.slots.installLocale(locale)
   return runtime
 }

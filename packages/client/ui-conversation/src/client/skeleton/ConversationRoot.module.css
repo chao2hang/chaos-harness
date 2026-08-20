@@ -32,6 +32,12 @@
   border-bottom: 1px solid transparent;
 }
 
+/* Phone drawer: only the title row reserves the hamburger corner. The status
+   rail and tabs still use the full phone width below it. */
+.root[data-drawer] .titleCluster {
+  margin-left: 44px;
+}
+
 .header::after {
   content: '';
   position: absolute;
@@ -53,7 +59,7 @@
 .titleRow {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 16px;
   min-height: 32px;
 }
 
@@ -61,7 +67,16 @@
   display: flex;
   flex: 1;
   align-items: center;
-  gap: 10px;
+  min-width: 0;
+}
+
+/* Session identity stays visually primary; preset, jobs, subagents, and
+   telemetry form one instrument rail whose entries share compact geometry. */
+.statusRail {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -125,7 +140,6 @@
   flex: none;
   align-items: center;
   gap: 8px;
-  margin-left: 20px;
 }
 
 .headerUtilities:empty {
@@ -243,6 +257,13 @@
   scrollbar-gutter: stable;
 }
 
+/* The extra wrapper is layout-neutral on desktop. On phones it becomes the
+   transcript's own flex scroller, leaving the composer in a real footer row
+   instead of painting the full work stack over the conversation. */
+.sessionBody {
+  display: contents;
+}
+
 .root[data-phase='active'] .viewArea {
   flex: 1 0 auto;
   min-height: auto;
@@ -285,7 +306,7 @@
   scrollbar-gutter: auto;
 }
 
-.scrollBody:has([data-conversation-composer-overlay]) > :global([data-slot='conversation.session']) > .viewArea {
+.scrollBody:has([data-conversation-composer-overlay]) > .sessionBody > :global([data-slot='conversation.session']) > .viewArea {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
@@ -362,4 +383,131 @@
    mounted but invisible so no wrong layout flashes before the phase lands. */
 .root[data-phase='settling'] .composerSeat {
   visibility: hidden;
+}
+
+/* Phone layout: the transcript owns the scrollport and the composer is a
+   normal footer. The footer can become internally scrollable, but it never
+   covers transcript rows while a reader moves through the conversation. */
+@media (max-width: 640px) {
+  .root {
+    --dsh-composer-side-clearance: 12px;
+    --dsh-composer-dock-inset: 6px;
+  }
+
+  .root[data-drawer] .header {
+    padding: 12px 12px 0;
+  }
+
+  .titleRow {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .titleCluster {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .root[data-drawer] .titleCluster {
+    margin-left: 44px;
+    width: calc(100% - 44px);
+  }
+
+  .root[data-drawer] .header {
+    padding-top: 8px;
+  }
+
+  .statusRail {
+    box-sizing: border-box;
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-height: 32px;
+    padding: 2px 5px;
+    overflow-x: auto;
+    border: 1px solid var(--dsw-alias-border-l1);
+    border-radius: 12px;
+    background: var(--dsw-alias-fill-tsp-secondary);
+    scrollbar-width: none;
+  }
+
+  .statusRail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .headerActions,
+  .headerUtilities {
+    gap: 4px;
+  }
+
+  .tabs {
+    gap: 24px;
+    padding-left: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* The view switch is primary navigation on a phone, and the figma tab is 27px
+     tall including its underline. Padding grows the hit box without moving that
+     underline, which `.tab::after` still pins to the bottom edge. */
+  .tab {
+    padding-top: 10px;
+    padding-bottom: 15px;
+  }
+
+  .root[data-drawer] .scrollBody {
+    overflow: hidden;
+    scrollbar-gutter: auto;
+  }
+
+  .root[data-drawer] .sessionBody {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scrollbar-gutter: stable;
+    scroll-padding-block: 12px;
+  }
+
+  .root[data-drawer] .sessionBody > :global([data-slot='conversation.session']) > .viewArea {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  /* The hero state carries no transcript, so the growing session body above
+     became an empty box the height of the free space and pinned the hero to
+     the bottom edge under ~590px of blank column. Letting it shrink there
+     restores `.scrollBody`'s own centring — the placement every wider
+     viewport already shows. */
+  .root[data-drawer] .scrollBody:has(.composerHero) .sessionBody {
+    flex: 0 1 auto;
+  }
+
+  .root[data-drawer] .composerSeat {
+    position: static;
+    z-index: auto;
+    box-sizing: border-box;
+    max-height: min(56dvh, 480px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: 6px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--dsw-alias-bg-base);
+  }
+
+  .root[data-drawer] .composerSeat {
+    --dsh-composer-text-max-height: min(192px, 24dvh);
+  }
+
+  .root[data-drawer] .composerStack {
+    --dsh-composer-stack-gap: 5px;
+  }
 }

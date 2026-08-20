@@ -2,27 +2,45 @@
    layout offsets via the composed className. Icons stay visible when mounted;
    the time label is hover-revealed inside a data-time-hover-root scope. */
 
+/* The row never exceeds its message column: the clock label is the only
+   growable child, and on a phone it carries the full run-time reading
+   (clock · duration · TTFT · throughput) because the hover-reveal rule below
+   applies to pointer devices only. Wrapping keeps that reading intact when
+   the icons and the label cannot share one line. */
 .actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  height: 28px;
+  min-height: 28px;
+  max-width: 100%;
+  min-width: 0;
 }
 
-/* Clock before icons (user figma 388:20051) / after (assistant 43:32997). */
+/* Clock before icons (user figma 388:20051) / after (assistant 43:32997).
+   Shrinkable so a column narrower than the reading truncates it instead of
+   pushing the row past the conversation edge. */
 .timeStart {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   padding-right: 12px;
   font-size: 14px;
   line-height: 24px;
   color: var(--dsw-alias-label-tertiary);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .timeEnd {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   padding-left: 12px;
   font-size: 14px;
   line-height: 24px;
   color: var(--dsw-alias-label-tertiary);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

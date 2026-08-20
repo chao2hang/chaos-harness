@@ -9,11 +9,19 @@
  * entries retain identity. Pure component: everything arrives
  * through the three framework shares — zero cordis or framework imports,
  * zero self-made hooks.
+ *
+ * Below the phone drawer breakpoint (columns.ts SIDEBAR_DRAWER_BREAKPOINT)
+ * the sidebar leaves the grid entirely: the track is 0, the chat column takes
+ * the full width, and a frame-level hamburger opens the sidebar as a fixed
+ * overlay drawer (with scrim) over the chat — the auto-collapsed rail only
+ * exists between the drawer breakpoint and the wide auto-collapse width.
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
-import { computeColumns, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT } from './columns.ts'
+import type { PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
+import {
+  computeColumns, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT, SIDEBAR_DRAWER_BREAKPOINT,
+} from './columns.ts'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
 
@@ -22,6 +30,7 @@ export type AppFrameProps =
   & PropsRuntime<'root'>
   & PropsRenderSlots<'sidebar' | 'conversation' | 'details' | 'shell.overlay'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
+  & PropsLocale<'layout'>
 
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
@@ -89,6 +98,7 @@ export function AppFrame({
   useSessions,
   actions,
   renderSlot,
+  t,
 }: AppFrameProps) {
   const panels = useStore(s => s)
   const detailsSession = useSessions((s) => {
@@ -135,11 +145,27 @@ export function AppFrame({
   // absorbs the squeeze.
   const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
   useEffect(() => { actions.setNarrow(narrow) }, [actions, narrow])
-  const sidebarCollapsed = narrow ? !panels.narrowExpanded : panels.sidebar === 0
-  const sidebarPreference = sidebarCollapsed
+
+  // Phone viewports: the sidebar leaves the grid. The chat column takes the
+  // full width and the drawer toggle (hamburger) overlays the header corner;
+  // the drawer state reuses narrowExpanded (drawer open = manual narrow
+  // re-expand), so toggleSidebar flips it like the rail in the tablet range.
+  const drawer = viewport < SIDEBAR_DRAWER_BREAKPOINT
+  useEffect(() => { actions.setDrawer(drawer) }, [actions, drawer])
+  const drawerOpen = drawer && panels.narrowExpanded
+  const detailsDrawerOpen = drawer && panels.details > 0 && detailsSession !== undefined
+
+  const sidebarCollapsed = drawer ? !drawerOpen : narrow ? !panels.narrowExpanded : panels.sidebar === 0
+  const sidebarPreference = drawer
     ? 0
-    : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
-  const cols = computeColumns(viewport, sidebarPreference, detailsSession === undefined ? 0 : panels.details)
+    : sidebarCollapsed
+      ? 0
+      : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
+  // The drawer keeps details closed too: the center needs the full viewport,
+  // and the details column has no room beside it at phone widths.
+  const cols = drawer
+    ? { sidebar: 0, center: viewport, details: 0 }
+    : computeColumns(viewport, sidebarPreference, detailsSession === undefined ? 0 : panels.details)
   const colsRef = useRef(cols)
   colsRef.current = cols
 
@@ -169,33 +195,65 @@ export function AppFrame({
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={cols.details === 0 || undefined}
       data-dragging={dragging || undefined}
+      data-drawer={drawer || undefined}
+      data-drawer-open={drawerOpen || undefined}
     >
-      <div className={css.sidebarCol}>
-        {/* Render-site slot call with live concession output: a closed
-            sidebar keeps the mounted slot at the compact-rail width, and the
-            component sees its rendered state as owner params decided here
-            (collapsed follows the resolved rail, so a derived auto-collapse
-            renders the rail UI too). */}
-        {renderSlot('sidebar', {
-          collapsed: sidebarCollapsed,
-          width: cols.sidebar,
-        })}
-      </div>
+      {drawer ? (
+        // Phone: the sidebar is an overlay drawer. The hamburger sits in the
+        // header corner (the conversation header reserves the space via the
+        // drawer owner prop); the scrim closes the drawer and restores the
+        // full-width chat.
+        <>
+          <button
+            type="button"
+            className={css.drawerToggle}
+            aria-label={drawerOpen ? t('drawer.close') : t('drawer.open')}
+            aria-expanded={drawerOpen}
+            onClick={() => { actions.toggleSidebar() }}
+          >
+            <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" className={css.drawerToggleIcon}>
+              <path d="M1.5 3.5H14.5M1.5 8H14.5M1.5 12.5H14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </button>
+          <div className={css.drawerScrim} data-open={drawerOpen || undefined} onClick={() => { actions.toggleSidebar() }} />
+          <div className={css.drawer} data-open={drawerOpen || undefined}>
+            {drawerOpen && renderSlot('sidebar', { collapsed: false, width: SIDEBAR_DEFAULT })}
+          </div>
+          <div className={css.detailsDrawerScrim} data-open={detailsDrawerOpen || undefined} onClick={() => { actions.closeDetails() }} />
+          <div className={css.detailsDrawer} data-open={detailsDrawerOpen || undefined}>
+            {renderSlot('details', {})}
+          </div>
+        </>
+      ) : (
+        <div className={css.sidebarCol}>
+          {/* Render-site slot call with live concession output: a closed
+              sidebar keeps the mounted slot at the compact-rail width, and the
+              component sees its rendered state as owner params decided here
+              (collapsed follows the resolved rail, so a derived auto-collapse
+              renders the rail UI too). */}
+          {renderSlot('sidebar', {
+            collapsed: sidebarCollapsed,
+            width: cols.sidebar,
+          })}
+        </div>
+      )}
       <>
         {/* Both column occupants stay at fixed tree positions from first
             paint — no loading gate: a bare status line reads worse than
             the shell's own pending rendering. The conversation
             is session-maybe; the strict details entry naturally renders
             empty while no session is current. */}
-        <CenterColumn>{renderSlot('conversation', {})}</CenterColumn>
-        <DetailsColumn>{renderSlot('details', {})}</DetailsColumn>
+        <CenterColumn>{renderSlot('conversation', { drawer })}</CenterColumn>
+        {!drawer && <DetailsColumn>{renderSlot('details', {})}</DetailsColumn>}
       </>
       <div className={css.overlayLayer} data-shell-overlay>
         {renderSlot('shell.overlay', {})}
       </div>
-      {/* The collapsed rail is fixed-width: no resize handle while closed. */}
-      {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
-      {cols.details > 0 && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
+      {/* The collapsed rail is fixed-width: no resize handle while closed.
+          The drawer has no grid track at all, so neither handle exists on
+          phones. */}
+      {!drawer && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
+      {!drawer && cols.details > 0 && <DragHandle side="details" left={viewport - cols.details} onStart={onDetailsStart} onDrag={onDetailsDrag} onEnd={onDragEnd} />}
     </div>
   )
 }

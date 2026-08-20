@@ -282,3 +282,17 @@
     animation: none;
   }
 }
+
+/* Touch drawer (phone drawer breakpoint): the shell's own header controls take
+   the same 40px hit box as the browsing region's, so the whole drawer is one
+   touch-sized surface. The brand row grows to match its sibling toggle. */
+@media (max-width: 640px) {
+  .iconButton {
+    width: 40px;
+    height: 40px;
+  }
+
+  .brand {
+    min-height: 40px;
+  }
+}

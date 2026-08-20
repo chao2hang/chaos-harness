@@ -67,11 +67,15 @@ describe('ModelSelect reasoning effort', () => {
       name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High',
     })
     fireEvent.click(trigger)
-    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
-    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
-      .toEqual(['Off', 'High', 'MaxLargest budget'])
+    fireEvent.click(screen.getByRole('menuitem', { name: /思维强度/ }))
+    const slider = screen.getByRole<HTMLInputElement>('slider', { name: '思维强度' })
+    expect(slider.value).toBe('4')
+    expect(slider.getAttribute('aria-valuetext')).toBe('High')
+    expect(screen.getByText('MINIMAL')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Max/ }))
+    fireEvent.change(slider, { target: { value: '6' } })
+    expect(select).not.toHaveBeenCalled()
+    fireEvent.pointerUp(slider)
     await waitFor(() => {
       expect(select).toHaveBeenCalledWith({
         provider: 'deepseek-official',
@@ -79,6 +83,93 @@ describe('ModelSelect reasoning effort', () => {
         reasoningEffort: 'max',
       })
       expect(trigger.getAttribute('aria-label')).toBe('选择模型，当前 DeepSeek-V4-Flash，推理等级 Max')
+    })
+  })
+
+  it('edits custom model capacities from the model picker', async () => {
+    const directory = createSnapshotStore<ModelDirectoryState>(state({
+      groups: [{
+        id: 'custom',
+        name: 'Custom',
+        models: [{
+          id: 'm', name: 'Custom M', reasoning,
+          contextWindow: 256_000, maxTokens: 32_000, capabilitiesEditable: true,
+        }],
+      }],
+      current: { provider: 'custom', model: 'm', reasoningEffort: 'high' },
+    }))
+    const select = vi.fn(async () => true)
+    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /选择模型，当前 Custom M/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /上下文窗口/ }))
+    const context = screen.getByRole<HTMLInputElement>('slider', { name: '上下文窗口' })
+    expect(context.getAttribute('aria-valuetext')).toBe('256K')
+    fireEvent.change(context, { target: { value: '7' } })
+    expect(select).not.toHaveBeenCalled()
+    fireEvent.pointerUp(context)
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({
+        provider: 'custom', model: 'm', reasoningEffort: 'high', contextWindow: 1_000_000,
+      })
+    })
+  })
+
+  it('falls back to the closest lower shared effort when switching models', async () => {
+    const groups = [{
+      id: 'provider',
+      name: 'Provider',
+      models: [
+        { id: 'wide', name: 'Wide', reasoning },
+        { id: 'narrow', name: 'Narrow', reasoning: { efforts: [{ id: 'off', name: 'Off' }, { id: 'high', name: 'High' }] } },
+      ],
+    }]
+    const directory = createSnapshotStore<ModelDirectoryState>(state({
+      groups,
+      current: { provider: 'provider', model: 'wide', reasoningEffort: 'max' },
+    }))
+    const select = vi.fn(async (selection: ModelSelection) => {
+      directory.set(state({ groups, current: selection }))
+      return true
+    })
+    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /当前 Wide/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Narrow' }))
+
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({ provider: 'provider', model: 'narrow', reasoningEffort: 'high' })
+      expect(screen.getByRole('alert').textContent).toContain('当前模型不支持 Max，已切换到 High')
+    })
+  })
+
+  it('clears an explicit effort when the next model exposes no adjustable levels', async () => {
+    const groups = [{
+      id: 'provider',
+      name: 'Provider',
+      models: [
+        { id: 'reasoner', name: 'Reasoner', reasoning },
+        { id: 'plain', name: 'Plain' },
+      ],
+    }]
+    const directory = createSnapshotStore<ModelDirectoryState>(state({
+      groups,
+      current: { provider: 'provider', model: 'reasoner', reasoningEffort: 'max' },
+    }))
+    const select = vi.fn(async (selection: ModelSelection) => {
+      directory.set(state({ groups, current: selection }))
+      return true
+    })
+    render(<ModelSelect locked={false} available directory={directory} load={vi.fn()} select={select} t={t} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /当前 Reasoner/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Plain' }))
+
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith({ provider: 'provider', model: 'plain' })
+      expect(screen.getByRole('alert').textContent).toContain('已切换到 Default')
     })
   })
 
@@ -107,9 +198,10 @@ describe('ModelSelect reasoning effort', () => {
     fireEvent.click(screen.getByRole('button', {
       name: '选择模型，当前 Model，推理等级 Default',
     }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
-    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
-      .toEqual(['Default', 'Standard'])
+    fireEvent.click(screen.getByRole('menuitem', { name: /思维强度/ }))
+    const slider = screen.getByRole<HTMLInputElement>('slider', { name: '思维强度' })
+    expect(slider.getAttribute('aria-valuetext')).toBe('Default')
+    fireEvent.change(slider, { target: { value: '4' } })
   })
 
   it('prompts for a selection when the current model is no longer advertised', () => {
@@ -129,7 +221,7 @@ describe('ModelSelect reasoning effort', () => {
     const trigger = screen.getByRole('button', { name: '选择模型' })
     expect(trigger.textContent).toContain('选择模型')
     fireEvent.click(trigger)
-    expect(screen.queryByRole('menuitem', { name: /推理等级/ })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /思维强度/ })).toBeNull()
     fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
     expect(screen.queryByText('removed-model')).toBeNull()
     expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()

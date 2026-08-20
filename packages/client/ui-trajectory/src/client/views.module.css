@@ -26,3 +26,9 @@
   /* ConversationRoot publishes the floating composer's live height. */
   --dsh-trajectory-bottom-clearance: calc(var(--dsh-composer-height, 152px) + 16px);
 }
+
+@media (max-width: 640px) {
+  :global([data-drawer]) .root {
+    --dsh-trajectory-bottom-clearance: 16px;
+  }
+}

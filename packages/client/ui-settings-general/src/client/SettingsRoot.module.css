@@ -224,3 +224,116 @@
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+
+@media (max-width: 600px) {
+  .overlay {
+    align-items: flex-end;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: none;
+    height: min(92vh, calc(100vh - 12px));
+    border-right: none;
+    border-bottom: none;
+    border-left: none;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    z-index: 1;
+    width: 36px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--dsw-alias-border-l3);
+    transform: translateX(-50%);
+  }
+
+  .nav {
+    width: 100%;
+    padding: 24px 16px 0;
+    gap: 8px;
+  }
+
+  /* Room for the close button, which moves onto this row (see `.close`). */
+  .navTitle {
+    padding: 0 52px 0 4px;
+    font-size: 18px;
+    line-height: 26px;
+  }
+
+  .navList {
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+  }
+
+  .navList::-webkit-scrollbar {
+    display: none;
+  }
+
+  .navCell {
+    flex: 0 0 auto;
+    width: auto;
+    height: 44px;
+    padding: 0 12px;
+    border-radius: 12px;
+  }
+
+  .navLabel {
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .content {
+    min-height: 0;
+  }
+
+  /* The stacked phone panel puts the title, the nav scroller, and this row on
+     three separate lines. The close button belongs beside the title, so it
+     leaves the flow and rides the panel corner; the row then holds only the
+     section's own actions and collapses to nothing when a section has none. */
+  .header {
+    height: auto;
+    min-height: 0;
+    padding: 0 16px 8px;
+  }
+
+  .close {
+    position: absolute;
+    top: 18px;
+    right: 12px;
+    z-index: 2;
+    width: 44px;
+    height: 44px;
+  }
+
+  .options {
+    padding: 0 16px max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+@supports (height: 100dvh) {
+  @media (max-width: 600px) {
+    .panel {
+      height: min(92dvh, calc(100dvh - 12px));
+    }
+  }
+}
+
+/* Touch height for the sidebar foot row that opens this panel. Gated on the
+   phone drawer breakpoint, not the sheet breakpoint above: the row lives in
+   the drawer, so it becomes a touch target wherever the drawer does. */
+@media (max-width: 640px) {
+  .trigger {
+    height: 44px;
+  }
+}

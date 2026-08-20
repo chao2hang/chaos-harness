@@ -192,6 +192,7 @@ export function WorkspacePickFlow({
         onClose={onClose}
         side={side}
         portal
+        mobileSheet
         getAnchorRect={getAnchorRect}
       />
       {open && !addIsTheOnlyEntry && !menuIsEmpty && workspaceSnapshot.phase === 'pending' && <div className={css.menuStatus} role="status">{t('picker.loading')}</div>}

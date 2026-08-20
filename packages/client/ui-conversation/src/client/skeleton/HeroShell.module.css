@@ -205,3 +205,11 @@
   line-height: 18px;
   color: var(--dsw-alias-state-error-primary);
 }
+
+/* Touch height for the hero's workspace chip, which sits on the same row as
+   the agent-preset seat and above the touch-sized composer controls. */
+@media (max-width: 640px) {
+  .workspace {
+    min-height: 40px;
+  }
+}

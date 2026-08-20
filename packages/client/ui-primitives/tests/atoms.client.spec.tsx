@@ -76,6 +76,18 @@ describe('Menu', () => {
     expect(onSelect).toHaveBeenCalledWith('a')
   })
 
+  it('mobileSheet adds a dismissible scrim without changing menu selection semantics', () => {
+    const onClose = vi.fn()
+    const { container } = render(
+      <Menu mobileSheet open anchor={<span>trigger</span>} items={items} onSelect={() => {}} onClose={onClose} />,
+    )
+    const scrim = container.querySelector('[aria-hidden="true"]')
+    expect(scrim).not.toBeNull()
+    fireEvent.click(scrim!)
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('menuitem', { name: 'Alpha' })).toBeDefined()
+  })
+
   it('disabled item does not select; Escape and outside pointerdown close', () => {
     const onSelect = vi.fn()
     const onClose = vi.fn()

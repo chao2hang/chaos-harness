@@ -31,6 +31,12 @@ export const SIDEBAR_COLLAPSED = 56
  * LG breakpoint); a manual toggle below it re-expands over the squeezed center
  * (stores.ts narrowExpanded). */
 export const SIDEBAR_AUTO_COLLAPSE = 1024
+/** Viewport width below which the sidebar leaves the grid entirely and becomes
+ * an overlay drawer (phone class): the track is 0, the chat column takes the
+ * full width, and a frame-level hamburger opens the drawer over it. Below
+ * SIDEBAR_AUTO_COLLAPSE but at or above this width, the auto-collapsed rail
+ * stays in the grid as today. */
+export const SIDEBAR_DRAWER_BREAKPOINT = 640
 /** Details drag clamp floor. */
 export const DETAILS_MIN = 300
 /** Details drag clamp ceiling. */

@@ -113,40 +113,43 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
         </button>
       </Tooltip>
       {open && (
-        <div className={css.panel} role="dialog" aria-label={t('context.used')}>
-          <div className={css.header}>
-            {/* Empty sides collapse through `.headline:empty` so the locale that
-                needs no leading (or trailing) text spends no header gap. */}
-            <span className={css.headline}>{headBefore}</span>
-            <span className={css.percent}>{reading}</span>
-            <span className={css.headline}>{headAfter}</span>
-            <span className={css.figures}>
-              {`~${formatTokens(context.usedTokens)} / ${formatTokens(context.contextWindow)}`}
-            </span>
-          </div>
-          <div className={css.bar}>
-            {segments.map(segment => (
-              <div
-                key={segment.key}
-                className={segment.color === undefined ? css.segment : `${css.segment} ${segment.color}`}
-                style={{ width: `${segment.width}%` }}
-              />
-            ))}
-          </div>
-          {breakdown !== undefined && (
-            <dl className={css.rows}>
-              {ROWS.map(row => (
-                <div key={row.key} className={css.row}>
-                  <dt>
-                    <span className={`${css.swatch} ${row.color}`} aria-hidden />
-                    {t(row.label)}
-                  </dt>
-                  <dd>{`~${formatTokens(breakdown[row.key])}`}</dd>
-                </div>
+        <>
+          <div className={css.scrim} aria-hidden="true" onClick={() => { setOpen(false) }} />
+          <div className={css.panel} role="dialog" aria-label={t('context.used')}>
+            <div className={css.header}>
+              {/* Empty sides collapse through `.headline:empty` so the locale that
+                  needs no leading (or trailing) text spends no header gap. */}
+              <span className={css.headline}>{headBefore}</span>
+              <span className={css.percent}>{reading}</span>
+              <span className={css.headline}>{headAfter}</span>
+              <span className={css.figures}>
+                {`~${formatTokens(context.usedTokens)} / ${formatTokens(context.contextWindow)}`}
+              </span>
+            </div>
+            <div className={css.bar}>
+              {segments.map(segment => (
+                <div
+                  key={segment.key}
+                  className={segment.color === undefined ? css.segment : `${css.segment} ${segment.color}`}
+                  style={{ width: `${segment.width}%` }}
+                />
               ))}
-            </dl>
-          )}
-        </div>
+            </div>
+            {breakdown !== undefined && (
+              <dl className={css.rows}>
+                {ROWS.map(row => (
+                  <div key={row.key} className={css.row}>
+                    <dt>
+                      <span className={`${css.swatch} ${row.color}`} aria-hidden />
+                      {t(row.label)}
+                    </dt>
+                    <dd>{`~${formatTokens(breakdown[row.key])}`}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        </>
       )}
     </span>
   )

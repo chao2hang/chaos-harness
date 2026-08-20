@@ -190,3 +190,9 @@
 .toBottom:hover {
   background: var(--dsw-alias-button-floating-hover);
 }
+
+@media (max-width: 640px) {
+  :global([data-drawer]) :global([data-conversation-scroll]) .toBottomSlot {
+    bottom: 16px;
+  }
+}

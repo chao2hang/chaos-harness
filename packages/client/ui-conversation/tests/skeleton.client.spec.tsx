@@ -99,6 +99,8 @@ function mount(
     composerBlock?: { reason: string }
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** Phone drawer mode (ConversationRoot's owner share from the layout frame). */
+    drawer?: boolean
   } = {},
 ) {
   const root = sid('root')
@@ -236,6 +238,7 @@ function mount(
   )) as ConversationRootProps['renderSlotChain']
   const props: ConversationRootProps = {
     sessionId: SID,
+    drawer: options.drawer ?? false,
     SessionProvider: ({ children }) => children(SID),
     useSession,
     useSessions: bindSnapshotSelector(sessions),
@@ -337,6 +340,13 @@ describe('ConversationRoot resident composer', () => {
     expect(seat?.contains(textarea)).toBe(true)
     expect(b.slotCalls).toContain('conversation.session.header.actions')
     expect(b.slotCalls).toContain('conversation.session.header.utilities')
+  })
+
+  it('drawer mode: the root announces it so the header can reserve the hamburger corner', () => {
+    const wide = mount(conversationSnapshot())
+    expect(wide.view.container.firstElementChild?.hasAttribute('data-drawer')).toBe(false)
+    const phone = mount(conversationSnapshot(), undefined, undefined, { drawer: true })
+    expect(phone.view.container.firstElementChild?.hasAttribute('data-drawer')).toBe(true)
   })
 
   it('sticky composer seat wraps the whole overlay chain, not only the fallback stack', () => {

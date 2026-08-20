@@ -127,7 +127,9 @@ export function PermissionSelect({ value, locked, command, t }: PermissionSelect
 
   return (
     <>
+      {open && <div className={css.mobileScrim} aria-hidden="true" onClick={() => { setOpen(false) }} />}
       <Menu
+        className={css.menuRoot ?? ''}
         open={open}
         items={items}
         selectedId={currentValue}

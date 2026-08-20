@@ -100,6 +100,12 @@
   overflow-y: auto;
 }
 
+@media (max-width: 640px) {
+  .list {
+    max-height: min(120px, 22dvh);
+  }
+}
+
 .item {
   display: flex;
   align-items: center;

@@ -1,9 +1,16 @@
 .frame {
   position: relative; /* anchors the drag handles, which straddle column borders */
+  /* Keep shell-owned drawer layers below body-portaled dialogs, menus, and
+     sheets even when their local z-indexes are higher. */
+  isolation: isolate;
   display: grid;
   grid-template-rows: 100%;
+  box-sizing: border-box;
   height: 100%;
   overflow: hidden;
+  /* One owner for the device inset: children keep their 12px chrome and do
+     not add another env(safe-area-inset-*). */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   background: var(--dsw-alias-bg-base);
   /* Collapse/expand animates the tracks on the deepsuite sider curve
      (--ds-ease-in-out / --ds-transition-duration-slow, ui-theme base.css). */
@@ -22,7 +29,12 @@
   }
 }
 
+.frame[data-drawer] {
+  grid-template-columns: 1fr !important;
+}
+
 .sidebarCol {
+  grid-column: 1;
   min-width: 0;
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
@@ -30,13 +42,26 @@
 }
 
 .centerCol {
+  grid-column: 2;
   min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
+.frame[data-drawer] .centerCol {
+  grid-column: 1 / -1;
+}
+
+/* The open phone drawer owns the foreground surface. Keep the conversation
+   mounted for state continuity, but do not let its composer paint through the
+   drawer or scrim. */
+.frame[data-drawer-open] .centerCol {
+  visibility: hidden;
+}
+
 .detailsCol {
+  grid-column: 3;
   min-width: 0;
   overflow: hidden;
   border-left: 1px solid var(--dsw-alias-border-l2);
@@ -116,4 +141,131 @@
 
 .overlayLayer > * {
   pointer-events: auto;
+}
+
+/* Phone drawer: the sidebar leaves the grid entirely below
+   SIDEBAR_DRAWER_BREAKPOINT. The hamburger rides the header corner (the
+   conversation header reserves it via the drawer owner prop), the scrim
+   dims and blocks the chat, and the drawer slides in over it. z-index keeps
+   the toggle under the scrim so the scrim's click closes the drawer even
+   where they overlap. */
+.drawerToggle {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.drawerToggle:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.drawerToggleIcon {
+  display: block;
+}
+
+.drawerScrim {
+  position: absolute;
+  inset: 0;
+  /* Stay above fixed/portalled composer controls in the chat column. */
+  z-index: 1000;
+  /* The same dimming every other full-viewport dismissible layer uses (Modal,
+     the mobile-sheet Menu, the settings overlay). The drop mask is white in
+     the light theme, which left the covered conversation indistinguishable
+     from the drawer beside it. */
+  background: var(--dsw-alias-bg-mask-1);
+  backdrop-filter: var(--dsw-mask-blur);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.drawerScrim[data-open] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  /* Render above the scrim so the sidebar stays fully opaque and interactive. */
+  z-index: 1010;
+  box-sizing: border-box;
+  width: min(var(--dsh-drawer-width, 280px), 100%);
+  background: var(--dsw-specific-sidebar-fill);
+  border-right: 1px solid var(--dsw-alias-border-l1);
+  box-shadow: var(--dsw-shadow-lv3);
+  transform: translateX(-100%);
+  pointer-events: none;
+  visibility: hidden;
+  transition: transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
+              visibility var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.drawer[data-open] {
+  transform: translateX(0);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.detailsDrawerScrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  background: var(--dsw-alias-bg-mask-1);
+  backdrop-filter: var(--dsw-mask-blur);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.detailsDrawerScrim[data-open] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.detailsDrawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  z-index: 1010;
+  box-sizing: border-box;
+  width: min(480px, 100%);
+  background: var(--dsw-alias-bg-base);
+  border-left: 1px solid var(--dsw-alias-border-l1);
+  box-shadow: var(--dsw-shadow-lv3);
+  transform: translateX(100%);
+  pointer-events: none;
+  visibility: hidden;
+  transition: transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
+              visibility var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+.detailsDrawer[data-open] {
+  transform: translateX(0);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawerScrim,
+  .drawer,
+  .detailsDrawerScrim,
+  .detailsDrawer {
+    transition: none;
+  }
 }

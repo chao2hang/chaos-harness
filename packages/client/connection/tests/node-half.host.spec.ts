@@ -74,7 +74,10 @@ function fakeResponse(): { response: ServerResponse; state: { status?: number; b
   return { response, state }
 }
 
-async function mounted(config?: { trustedHosts?: string[] }): Promise<{
+async function mounted(
+  config?: { trustedHosts?: string[] },
+  authenticated = false,
+): Promise<{
   routes: WebRoute[]
   upgrades: WebUpgradeRoute[]
   dispose: () => Promise<void>
@@ -84,6 +87,7 @@ async function mounted(config?: { trustedHosts?: string[] }): Promise<{
   const upgrades: WebUpgradeRoute[] = []
   ctx.provide('webServer', fakeHttpServer(routes, upgrades) as WebServer)
   ctx.provide('apiProxy', {} as unknown as ApiProxy)
+  if (authenticated) ctx.provide('webAuth', { authenticated: () => true })
   const fiber = ctx.plugin({ inject: [...inject], apply }, config)
   await fiber.await()
   return { routes, upgrades, dispose: () => fiber.dispose() }
@@ -161,21 +165,42 @@ describe('connection node half', () => {
     await dispose()
   })
 
-  it('pins privileged methods to loopback even for a declared trusted authority', async () => {
-    const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] })
-    // The privileged set: native dialogs plus the whole settings/credential
-    // configuration plane, reads included, plus the one method that makes the
-    // host fetch a caller-chosen URL. The same declared authority reaches
-    // ordinary reads (carrier-level 404 from the empty proxy proves the fence
-    // passed), but each privileged method stays loopback-only and 403s.
-    for (const method of [
-      'host.pickDirectory', 'host.openPath',
-      'settings.describe', 'settings.openDocument', 'settings.update', 'settings.replace', 'settings.mutate',
-      'credentials.describe', 'credentials.set', 'credentials.unset',
+  it('requires loopback or an authenticated Web session for sensitive methods', async () => {
+    const methods = [
+      // Restarting ends every session on the host, and an all-interfaces
+      // deployment is exactly where no one can reach a terminal to undo it.
+      'host.restart',
       'llm.discoverModels',
-      // A composition names the plugins a session runs: reading one is
-      // reconnaissance, and copy/remove/openDocument manage the roster and
-      // drive the host desktop.
+      'settings.describe', 'settings.update', 'settings.replace', 'settings.mutate',
+      'credentials.describe', 'credentials.set', 'credentials.unset',
+    ]
+    const anonymous = await mounted({ trustedHosts: ['harness.example'] })
+    for (const method of methods) {
+      const denied = fakeResponse()
+      await anonymous.routes[0]!.handler(
+        fakeRequest({ host: 'harness.example' }, `${API_PATH}/${method}`),
+        denied.response,
+      )
+      expect([method, denied.state.status, denied.state.body]).toEqual([method, 403, 'forbidden'])
+    }
+    await anonymous.dispose()
+
+    const authenticated = await mounted({ trustedHosts: ['harness.example'] }, true)
+    for (const method of methods) {
+      const allowed = fakeResponse()
+      await authenticated.routes[0]!.handler(
+        fakeRequest({ host: 'harness.example' }, `${API_PATH}/${method}`),
+        allowed.response,
+      )
+      expect([method, allowed.state.status]).toEqual([method, 404])
+    }
+    await authenticated.dispose()
+  })
+
+  it('keeps desktop and preset-document methods loopback-only after Web authentication', async () => {
+    const { routes, dispose } = await mounted({ trustedHosts: ['harness.example'] }, true)
+    for (const method of [
+      'host.pickDirectory', 'host.openPath', 'settings.openDocument',
       'agentPreset.read', 'agentPreset.copy', 'agentPreset.openDocument', 'agentPreset.remove',
     ]) {
       const denied = fakeResponse()
@@ -183,12 +208,8 @@ describe('connection node half', () => {
         fakeRequest({ host: 'harness.example' }, `${API_PATH}/${method}`),
         denied.response,
       )
-      expect(denied.state.status).toBe(403)
-      expect(denied.state.body).toBe('forbidden')
+      expect([method, denied.state.status, denied.state.body]).toEqual([method, 403, 'forbidden'])
     }
-    const read = fakeResponse()
-    await routes[0]!.handler(fakeRequest({ host: 'harness.example' }), read.response)
-    expect(read.state.status).not.toBe(403)
     await dispose()
   })
 
@@ -467,6 +488,9 @@ describe('connection node half over a real HTTP server', () => {
         'settings.describe', 'settings.openDocument', 'settings.update', 'settings.replace', 'settings.mutate',
         'credentials.describe', 'credentials.set', 'credentials.unset',
         'host.pickDirectory', 'host.openPath',
+        // Stops the server every other caller is using; an authenticated
+        // session may ask for it, an anonymous LAN caller may not.
+        'host.restart',
         // Carries a draft credential and turns the host into a fetcher for a
         // URL the caller picked: an anonymous LAN caller must not reach it.
         'llm.discoverModels',

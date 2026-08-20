@@ -1,0 +1,126 @@
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 3px 7px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.trigger:hover,
+.trigger:focus-visible {
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.trigger[data-active] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.text {
+  font-family: var(--ds-font-family-code, monospace);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  width: 270px;
+  padding: 12px 14px;
+  background: var(--dsw-alias-bg-base);
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  box-shadow: var(--dsw-shadow-lv3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-tertiary);
+  margin-bottom: 2px;
+}
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.itemValue {
+  font-weight: 500;
+  font-family: var(--ds-font-family-code, monospace);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Phone: the breakdown leaves its trigger and becomes a viewport-pinned sheet,
+   the same presentation the model, permission, and context-meter selectors take
+   at this width. Anchored to the pill it kept the desktop `right: 0` rule, so a
+   270px panel hanging off a pill near the left edge ran past the viewport and
+   clipped its own left column. Dismissal is unchanged: the owner still closes on
+   outside pointerdown and Escape. */
+@media (max-width: 640px) {
+  .popover {
+    position: fixed;
+    /* Above the composer's model and permission roots, which hold z-index 1000
+       at this width even while closed; the shared Modal tier is the ladder's
+       seat for a dismissible layer over the whole column. */
+    z-index: 1050;
+    top: auto;
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 12px;
+    width: auto;
+    max-height: min(70dvh, calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+    overflow-y: auto;
+  }
+}

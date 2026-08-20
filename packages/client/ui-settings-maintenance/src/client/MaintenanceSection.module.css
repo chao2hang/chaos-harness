@@ -1,0 +1,109 @@
+/* System section: the settings column heading pair over two bordered cards,
+ * matching the Plugins section's column metrics. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.heading {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.intro {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 16px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 22px;
+}
+
+.cardBody {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.muted {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.statusRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.statusLabel {
+  flex: 0 0 96px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* Paths and versions are host-shaped text: keep them monospaced and let a long
+ * working directory wrap inside the card instead of widening the column. */
+.statusValue {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--ds-font-family-code);
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.pending,
+.done,
+.failed {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.pending {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.done {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.failed {
+  color: var(--dsw-alias-state-error-primary);
+}

@@ -25,7 +25,7 @@
      the sides narrow with the shared width axis); the bottom gradient mask
      is owned by the chat scroller. No top pad: the composer stack's gap owns
      the space above; error/status strips still carry their own margin. */
-  padding: 0 var(--dsh-composer-side-clearance) 8px;
+  padding: 0 var(--dsh-composer-side-clearance) calc(8px + env(safe-area-inset-bottom));
 }
 
 .hero {
@@ -319,7 +319,8 @@
 }
 
 .trailing {
-  flex: none;
+  flex: 1 1 auto;
+  justify-content: flex-end;
   gap: 12px;
 }
 
@@ -473,4 +474,58 @@
   background: rgba(216, 97, 97, 0.2);
   text-decoration: line-through;
   opacity: 0.7;
+}
+
+/* Touch composer (phone drawer breakpoint): the figma control row is drawn for
+   a mouse — 28px chips and a 34px send circle are below every touch-target
+   minimum, and this is the most-used row in the product on a phone. The glyphs
+   and type keep their sizes; only the hit boxes grow. */
+@media (max-width: 640px) {
+  /* Touch-sized circles cannot also carry the row's mouse gaps: at 320px the
+     two 40px circles plus 16px gaps already exceed the tools group's share and
+     squeezed the mode chips inside it to zero width. */
+  .row,
+  .tools,
+  .modes,
+  .trailing {
+    gap: 8px;
+  }
+
+  /* Shrink order: the leading controls keep their size — the permission chip
+     inside them already collapses to its icon through the container query
+     above — and the model label, the one control with an ellipsis, absorbs
+     whatever deficit remains. */
+  .tools {
+    flex: none;
+  }
+
+  .add {
+    width: 40px;
+    height: 40px;
+  }
+
+  .select {
+    height: 40px;
+    padding-right: 24px;
+    background-position: right 6px center;
+  }
+
+  .primary {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Very narrow phones: a running session adds a stop control to the trailing
+   group, and at this width the model chip has no share left — it collapsed to
+   a bare chevron with no readable label. Giving the trailing group its own
+   line keeps every control legible instead. */
+@media (max-width: 360px) {
+  .row {
+    flex-wrap: wrap;
+  }
+
+  .trailing {
+    flex: 1 0 100%;
+  }
 }

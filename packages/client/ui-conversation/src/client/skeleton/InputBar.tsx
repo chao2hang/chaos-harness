@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
+  IconPaperclipOutline16, IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { AttachmentRail, DropOverlay, ImageLightbox } from '@deepseek-ai/dsh-client-ui-attachment'
 import type { AttachmentRailItem } from '@deepseek-ai/dsh-client-ui-attachment'
@@ -102,6 +102,7 @@ export function InputBar({
       : `${promptError.error.message} (${promptError.error.code})`)
   }, [promptError, showToast, t, imageLimits])
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const cardRef = useRef<HTMLDivElement | null>(null)
   const dragDepthRef = useRef(0)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -256,6 +257,8 @@ export function InputBar({
     if (el === null) return
     const onWheel = (e: WheelEvent): void => {
       const host = el.closest('[data-conversation-scroll]')
+        ?? el.closest('[data-composer-seat]')?.parentElement
+          ?.querySelector<HTMLElement>('[data-conversation-scroll]')
       if (!(host instanceof HTMLElement) || e.deltaY === 0) return
       const atTop = el.scrollTop <= 0
       const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
@@ -745,6 +748,37 @@ export function InputBar({
                 <IconPlusOutline16 size={14} />
               </button>
             </Tooltip>
+            {addImages !== undefined && (
+              <>
+                <Tooltip label={t('input.attach')} side="top" delayMs={500}>
+                  <button
+                    type="button"
+                    className={css.add}
+                    aria-label={t('input.attach')}
+                    disabled={locked || machineBusy}
+                    onMouseDown={keepFocus}
+                    onClick={() => { fileInputRef.current?.click() }}
+                  >
+                    <IconPaperclipOutline16 size={14} />
+                  </button>
+                </Tooltip>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  style={{ display: 'none' }}
+                  accept={imageLimits !== undefined ? (imageLimits.mediaTypes as readonly string[]).join(',') : 'image/png,image/jpeg,image/webp,image/gif'}
+                  multiple
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      intakeImages(Array.from(e.target.files))
+                      e.target.value = ''
+                    }
+                  }}
+                />
+              </>
+            )}
             <div className={css.modes}>
               {accessSelect}
               {renderSlot('conversation.input.plan', { locked })}

@@ -145,3 +145,46 @@
   font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-primary);
 }
+
+.scrim {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .scrim {
+    position: fixed;
+    z-index: 1000;
+    display: block;
+    inset: 0;
+    background: var(--dsw-alias-bg-mask-1);
+    backdrop-filter: var(--dsw-mask-blur);
+  }
+
+  .panel {
+    position: fixed;
+    inset-inline-start: max(0px, env(safe-area-inset-left));
+    inset-inline-end: max(0px, env(safe-area-inset-right));
+    bottom: 0;
+    z-index: 1001;
+    width: auto;
+    max-height: min(70vh, calc(100vh - 24px));
+    padding: 16px 16px max(16px, env(safe-area-inset-bottom));
+    border-right: none;
+    border-bottom: none;
+    border-left: none;
+    border-radius: 20px 20px 0 0;
+  }
+
+  .trigger {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@supports (height: 100dvh) {
+  @media (max-width: 600px) {
+    .panel {
+      max-height: min(70dvh, calc(100dvh - 24px));
+    }
+  }
+}

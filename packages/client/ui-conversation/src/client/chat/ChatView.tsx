@@ -28,6 +28,15 @@ function scrollerOf(from: HTMLElement): HTMLElement {
   return (from.closest('[data-conversation-scroll]')) ?? from
 }
 
+/** Resolve the composer inside the scrollport or in its mobile footer sibling. */
+function composerOf(scrollport: HTMLElement): HTMLElement | null {
+  const inside = scrollport.querySelector<HTMLElement>('[data-composer-seat]')
+  if (inside !== null) return inside
+  const parent = scrollport.parentElement
+  const sibling = parent?.querySelector<HTMLElement>('[data-composer-seat]')
+  return sibling?.parentElement === parent ? sibling : null
+}
+
 interface PagingAnchor {
   /** Stable node/call identity, independent of boundary-spanning group keys. */
   key: string
@@ -52,8 +61,10 @@ function flowTop(row: HTMLElement, scrollport: HTMLElement): number {
  * has not exposed a visible box yet. */
 function pagingAnchor(list: HTMLElement, scrollport: HTMLElement): HTMLElement | null {
   const viewport = scrollport.getBoundingClientRect()
-  const composer = scrollport.querySelector<HTMLElement>('[data-composer-seat]')
-  const visibleBottom = composer?.getBoundingClientRect().top ?? viewport.bottom
+  const composer = composerOf(scrollport)
+  const visibleBottom = composer?.parentElement === scrollport
+    ? composer.getBoundingClientRect().top
+    : viewport.bottom
   // Scroll events are hot: hit-test a few points through the stretched flow
   // rows before considering the full mounted set. The fallback keeps jsdom
   // and pre-layout states deterministic; a virtualizer naturally bounds it.
@@ -333,7 +344,7 @@ export function ChatView({
     const local = listRef.current
     if (column === null || local === null || typeof ResizeObserver === 'undefined') return
     const scrollport = scrollerOf(local)
-    const composer = scrollport.querySelector<HTMLElement>('[data-composer-seat]')
+    const composer = composerOf(scrollport)
     const observer = new ResizeObserver(() => { followRef.current?.() })
     observer.observe(column)
     if (composer !== null) observer.observe(composer)

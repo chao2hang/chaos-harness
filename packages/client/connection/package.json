@@ -54,11 +54,18 @@
     "lib/types/**/*.d.ts"
   ],
   "peerDependencies": {
+    "@deepseek-ai/dsh-host-web-auth": "workspace:^",
     "@deepseek-ai/dsh-host-webserver": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-host-web-auth": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@deepseek-ai/dsh-host-web-auth": "workspace:^",
     "@deepseek-ai/dsh-host-webserver": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
     "@types/ws": "^8.18.1",

@@ -31,7 +31,7 @@ import type {} from '@deepseek-ai/dsh-jobs'
 import type {} from '@deepseek-ai/dsh-shell-env'
 import type {} from '@deepseek-ai/dsh-user-approval'
 import type { SandboxExecutionPolicy, SandboxMode } from '@deepseek-ai/dsh-sandbox'
-import { ESCALATION_TARGETS, approveEscalation, validateEscalationArgs } from '@deepseek-ai/dsh-sandbox'
+import { ESCALATION_TARGETS, approveEscalation, isStrictlyWider, validateEscalationArgs } from '@deepseek-ai/dsh-sandbox'
 import type { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import type { ShellRunResult } from '@deepseek-ai/dsh-shell'
 import { parseExitStatus } from '@deepseek-ai/dsh-shell'
@@ -94,9 +94,6 @@ function validatePwshArgs(args: PwshToolArgs): void {
   if (args.timeoutMs !== undefined && (!Number.isFinite(args.timeoutMs) || args.timeoutMs <= 0)) {
     throw new Error(`invalid timeoutMs: expected a positive number, got ${JSON.stringify(args.timeoutMs)}`)
   }
-  // The escalation pairing (sandbox_permissions ⇔ justification, non-empty) is
-  // the shared rule both enforcing families validate identically.
-  validateEscalationArgs(args.sandbox_permissions, args.justification)
 }
 /* jscpd:ignore-end */
 
@@ -224,7 +221,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     justification: string,
     exec: ToolExecution,
     standingPolicy: SandboxExecutionPolicy | undefined,
-  ): Promise<SandboxMode> => {
+  ): Promise<SandboxMode | undefined> => {
     if (escalationModes.length === 0) {
       throw new Error('sandbox_permissions is not available in this composition (no sandboxing executor to escalate)')
     }
@@ -349,8 +346,16 @@ export function apply(ctx: Context, config: Config = {}): void {
       validatePwshArgs(args)
       // Description is display metadata; workdir defaults to the caller's session.
       const standingPolicy = resolveSandboxPolicy(exec)
-      const approvedMode = args.sandbox_permissions !== undefined && args.justification !== undefined
-        ? await approvePwshEscalation(args.sandbox_permissions, args.justification, exec, standingPolicy)
+      validateEscalationArgs(args.sandbox_permissions, args.justification, standingPolicy?.mode)
+      if (args.sandbox_permissions !== undefined && escalationModes.length === 0) {
+        throw new Error('sandbox_permissions is not available in this composition (no sandboxing executor to escalate)')
+      }
+      const widening = args.sandbox_permissions !== undefined
+        && args.justification !== undefined
+        && standingPolicy !== undefined
+        && isStrictlyWider(args.sandbox_permissions, standingPolicy.mode)
+      const approvedMode = widening
+        ? await approvePwshEscalation(args.sandbox_permissions!, args.justification!, exec, standingPolicy)
         : undefined
       const policy = approvedMode === undefined
         ? standingPolicy

@@ -491,6 +491,41 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+/* Touch drawer (phone drawer breakpoint): the header's 28px circles are the
+   entry points to search, filtering, and workspace creation, all below every
+   touch-target minimum. The header grows with them so the circles stay
+   centered in their row. */
+@media (max-width: 640px) {
+  .iconButton,
+  .searchButton {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* The collapsed search wrapper clips its own button (overflow: hidden), so
+     it has to grow with it or the larger hit box is cut back to 28px. The
+     expanded field keeps its drawn height through the higher-specificity
+     `.searchExpanded` rules above. */
+  .search {
+    height: 40px;
+  }
+
+  /* Both collapsed caps count out the 28px control width — one button, then
+     two plus their 4px gap. They have to be recounted at 40px, or the trailing
+     workspace-create action lands outside the header's own clip. */
+  .searchSlot {
+    max-width: 40px;
+  }
+
+  .headerActions {
+    max-width: 84px;
+  }
+
+  .sectionHeader {
+    height: 44px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wide {
     animation: none;

@@ -419,6 +419,22 @@ describe('image draft rail', () => {
     fireEvent.drop(card, { dataTransfer })
     expect(view.getByRole('alert').textContent).toContain('图片读取服务不可用')
   })
+
+  it('triggers file selection and takes attachments via the attachment button', () => {
+    const addImages = vi.fn(() => null)
+    const { view } = bench({ addImages })
+    const attachButton = view.getByRole('button', { name: '添加附件' })
+    expect(attachButton).toBeTruthy()
+    const fileInput = view.container.querySelector('input[type="file"]') as HTMLInputElement
+    expect(fileInput).toBeTruthy()
+    const clickSpy = vi.spyOn(fileInput, 'click')
+    fireEvent.click(attachButton)
+    expect(clickSpy).toHaveBeenCalled()
+
+    const files = [new File([Uint8Array.of(1, 2, 3)], 'photo.png', { type: 'image/png' })]
+    fireEvent.change(fileInput, { target: { files } })
+    expect(addImages).toHaveBeenCalledWith(files)
+  })
 })
 
 describe('Enter semantics', () => {

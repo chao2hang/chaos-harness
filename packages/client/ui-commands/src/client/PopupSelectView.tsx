@@ -106,56 +106,59 @@ export function PopupSelectView({ popup, t }: PopupSelectViewProps) {
   return (
     <>
       {state.confirming === null && (
-        <div
-          ref={cardRef}
-          className={css.card}
-          style={{ maxHeight }}
-          aria-label={t('overlay.aria', { command: String(state.command) })}
-          onKeyDown={onKeyDown}
-        >
-          <input
-            ref={searchRef}
-            className={css.search}
-            type="text"
-            placeholder={t('search.placeholder')}
-            aria-label={t('search.aria')}
-            value={state.search}
-            readOnly={state.submitting}
-            onChange={(ev) => { popup.setSearch(ev.currentTarget.value) }}
-          />
-          {state.error !== null && (
-            <div className={css.error} role="alert">
-              <span className={css.errorText}>{state.error}</span>
-              {state.status === 'failed' && (
-                <button type="button" className={css.retry} onClick={() => { popup.retry() }}>{t('retry')}</button>
-              )}
-            </div>
-          )}
-          {state.status === 'pending' && <div className={css.status}>{t('status.loading')}</div>}
-          {state.submitting && <div className={css.status}>{t('status.applying')}</div>}
-          {state.status === 'ready' && rows.length === 0 && <div className={css.status}>{t('status.empty')}</div>}
-          {state.status === 'ready' && (
-            <div role="listbox" aria-label={t('listbox.aria', { command: String(state.command) })} className={css.viewport}>
-              {rows.map((option, index) => (
-                <div
-                  key={option.id}
-                  role="option"
-                  aria-selected={index === state.active}
-                  className={clsx(css.row, index === state.active && css.rowActive)}
-                  // mousedown would race the document capture listener; the shell
-                  // owns focus anyway, so a plain click (inside the card → no
-                  // dismiss) works.
-                  onClick={() => { void popup.select(index) }}
-                  onMouseEnter={() => { popup.highlight(index) }}
-                >
-                  <span className={css.label}>{option.label}</span>
-                  {option.detail !== undefined && <span className={css.detail}>{option.detail}</span>}
-                  {option.active === true && <span className={css.check}><IconCheckOutline16 /></span>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <>
+          <div className={css.scrim} aria-hidden="true" onClick={() => { popup.dismiss() }} />
+          <div
+            ref={cardRef}
+            className={css.card}
+            style={{ maxHeight }}
+            aria-label={t('overlay.aria', { command: String(state.command) })}
+            onKeyDown={onKeyDown}
+          >
+            <input
+              ref={searchRef}
+              className={css.search}
+              type="text"
+              placeholder={t('search.placeholder')}
+              aria-label={t('search.aria')}
+              value={state.search}
+              readOnly={state.submitting}
+              onChange={(ev) => { popup.setSearch(ev.currentTarget.value) }}
+            />
+            {state.error !== null && (
+              <div className={css.error} role="alert">
+                <span className={css.errorText}>{state.error}</span>
+                {state.status === 'failed' && (
+                  <button type="button" className={css.retry} onClick={() => { popup.retry() }}>{t('retry')}</button>
+                )}
+              </div>
+            )}
+            {state.status === 'pending' && <div className={css.status}>{t('status.loading')}</div>}
+            {state.submitting && <div className={css.status}>{t('status.applying')}</div>}
+            {state.status === 'ready' && rows.length === 0 && <div className={css.status}>{t('status.empty')}</div>}
+            {state.status === 'ready' && (
+              <div role="listbox" aria-label={t('listbox.aria', { command: String(state.command) })} className={css.viewport}>
+                {rows.map((option, index) => (
+                  <div
+                    key={option.id}
+                    role="option"
+                    aria-selected={index === state.active}
+                    className={clsx(css.row, index === state.active && css.rowActive)}
+                    // mousedown would race the document capture listener; the shell
+                    // owns focus anyway, so a plain click (inside the card → no
+                    // dismiss) works.
+                    onClick={() => { void popup.select(index) }}
+                    onMouseEnter={() => { popup.highlight(index) }}
+                  >
+                    <span className={css.label}>{option.label}</span>
+                    {option.detail !== undefined && <span className={css.detail}>{option.detail}</span>}
+                    {option.active === true && <span className={css.check}><IconCheckOutline16 /></span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       )}
       {confirmation !== undefined && (
         <RiskConfirmation

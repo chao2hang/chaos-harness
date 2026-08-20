@@ -17,9 +17,14 @@ import { AppFrame } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.
 import type { AppFrameProps } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import { SIDEBAR_COLLAPSED } from '@deepseek-ai/dsh-client-ui-layout/src/client/columns.ts'
 import { createLayoutStore } from '@deepseek-ai/dsh-client-ui-layout/src/client/stores.ts'
+import { zh as layoutZh } from '@deepseek-ai/dsh-client-ui-layout/src/client/locales.ts'
+import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type {
   SessionId, SessionListState, WorkspaceListState,
 } from '@deepseek-ai/dsh-client-runtime/client'
+
+// Locale seat for the frame chrome (drawer toggle copy).
+const t = makeTranslate(layoutZh)
 
 // Session selection controls for the SessionProvider and useSessions stubs.
 const selectedSession = { current: 's-test' as SessionId | undefined }
@@ -88,6 +93,7 @@ function mountFrame() {
       useSessions={useSessions}
       useWorkspaces={((sel: (s: WorkspaceListState) => unknown) => sel(workspaceState)) as never}
       SessionProvider={SessionProviderStub}
+      t={t}
     />
   )
   const utils = render(element())
@@ -150,7 +156,7 @@ describe('AppFrame', () => {
     expect(keys).toContain('conversation')
     expect(keys).toContain('details')
     expect(keys).not.toContain('conversation.empty')
-    expect(slotCalls.find(c => c.key === 'conversation')!.props).toEqual({})
+    expect(slotCalls.find(c => c.key === 'conversation')!.props).toEqual({ drawer: false })
     expect(slotCalls.find(c => c.key === 'details')!.props).toEqual({})
   })
 
@@ -325,6 +331,75 @@ describe('AppFrame — narrow-viewport auto-collapse', () => {
     frameWidth = 1920
     act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
     expect(tracks(frame)).toEqual([400, 0])
+  })
+})
+
+describe('AppFrame — phone drawer breakpoint', () => {
+  it('leaves the sidebar out of the grid below the drawer breakpoint (chat takes the full width)', () => {
+    frameWidth = 480
+    const { frame, slotCalls } = mountFrame()
+    expect(tracks(frame)).toEqual([0, 0])
+    expect(frame.hasAttribute('data-drawer')).toBe(true)
+    // Closed drawer: the sidebar stays out of the DOM entirely (its mount is
+    // the open state), and the conversation learns it sits inside the drawer
+    // frame so the header can reserve the hamburger corner.
+    expect(slotCalls.filter(c => c.key === 'sidebar')).toHaveLength(0)
+    expect(slotCalls.find(c => c.key === 'conversation')!.props).toEqual({ drawer: true })
+    // No grid track means no resize handles.
+    expect(frame.querySelectorAll('[class*="handle"]')).toHaveLength(0)
+  })
+
+  it('the hamburger opens the drawer, which renders the sidebar wide over the chat', () => {
+    frameWidth = 480
+    const { frame, getByRole, slotCalls } = mountFrame()
+    const toggle = getByRole('button', { name: '打开侧边栏' })
+    act(() => { toggle.click() })
+    expect(slotCalls.filter(c => c.key === 'sidebar').at(-1)!.props).toEqual({ collapsed: false, width: 280 })
+    // `[class*="drawer"]` also matches the toggle/scrim; narrow to the panel.
+    const panel = frame.querySelector('[class*="drawer"]:not([class*="Toggle"]):not([class*="Scrim"])')!
+    const scrim = frame.querySelector('[class*="Scrim"]')!
+    expect(panel.hasAttribute('data-open')).toBe(true)
+    expect(scrim.hasAttribute('data-open')).toBe(true)
+    expect(frame.hasAttribute('data-drawer-open')).toBe(true)
+  })
+
+  it('the scrim click closes the drawer back to the hidden state', () => {
+    frameWidth = 480
+    const { frame, getByRole } = mountFrame()
+    act(() => { getByRole('button', { name: '打开侧边栏' }).click() })
+    const panel = frame.querySelector('[class*="drawer"]:not([class*="Toggle"]):not([class*="Scrim"]):not([class*="detailsDrawer"])')!
+    const scrim = frame.querySelector('[class*="drawerScrim"]')!
+    expect(panel.hasAttribute('data-open')).toBe(true)
+    act(() => { (scrim as HTMLElement).click() })
+    expect(panel.hasAttribute('data-open')).toBe(false)
+  })
+
+  it('opens and closes the mobile details drawer with scrim click', () => {
+    frameWidth = 480
+    const { frame, instance, getByTestId } = mountFrame()
+    act(() => { instance.actions.openDetails() })
+    const detailsPanel = frame.querySelector('[class*="detailsDrawer"]:not([class*="Scrim"])')!
+    const detailsScrim = frame.querySelector('[class*="detailsDrawerScrim"]')!
+    expect(detailsPanel.hasAttribute('data-open')).toBe(true)
+    expect(detailsScrim.hasAttribute('data-open')).toBe(true)
+    expect(getByTestId('details-content')).toBeTruthy()
+
+    act(() => { (detailsScrim as HTMLElement).click() })
+    expect(instance.getSnapshot().details).toBe(0)
+    expect(detailsPanel.hasAttribute('data-open')).toBe(false)
+  })
+
+  it('crossing back above the drawer breakpoint restores the rail in the grid', () => {
+    frameWidth = 480
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.toggleSidebar() }) // open the drawer
+    frameWidth = 980
+    act(() => { fireResize?.(); vi.advanceTimersByTime(20) })
+    expect(frame.hasAttribute('data-drawer')).toBe(false)
+    // 980 is still narrow (< 1024): the re-expand override re-materializes as
+    // the expanded rail, exactly as if the user had toggled at 980.
+    expect(tracks(frame)).toEqual([280, 0])
+    expect(instance.getSnapshot().narrowExpanded).toBe(true)
   })
 })
 

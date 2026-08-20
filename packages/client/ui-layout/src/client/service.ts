@@ -23,6 +23,11 @@ export type PanelActions = BoundActions<ReturnType<typeof createLayoutStore>>
 export interface ILayout {
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void
+  /**
+   * Close the phone overlay drawer after a navigation gesture. No-op at
+   * viewports where the sidebar shares the frame rather than covering it.
+   */
+  dismissDrawer(): void
   /** Open the details panel (no-op when already open). */
   openDetails(): void
   /** Close the details panel. */
@@ -47,6 +52,14 @@ export class LayoutController implements ILayout {
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void {
     this.#require().toggleSidebar()
+  }
+
+  /**
+   * Close the phone overlay drawer after a navigation gesture. No-op at
+   * viewports where the sidebar shares the frame rather than covering it.
+   */
+  dismissDrawer(): void {
+    this.#require().dismissDrawer()
   }
 
   /** Open the details panel (no-op when already open). */

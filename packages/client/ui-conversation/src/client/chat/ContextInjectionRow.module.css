@@ -23,8 +23,10 @@
   background: var(--dsw-alias-label-caption);
 }
 
+/* Shrinkable: a producer label wider than the row must ellipsize rather than
+   push the row past the conversation edge, which `flex: none` prevented. */
 .source {
-  flex: none;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--dsw-alias-label-tertiary);

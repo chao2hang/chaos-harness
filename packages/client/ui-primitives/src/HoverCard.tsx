@@ -108,7 +108,14 @@ export function HoverCard({
       const r = wrapper.getBoundingClientRect()
       const h = cardRef.current?.offsetHeight ?? 0
       const top = r.top + h > window.innerHeight - 8 ? window.innerHeight - h - 8 : r.top
-      setPos({ left: r.right + 8, top })
+      // Preferred side is the anchor's right. A window too narrow to hold the
+      // card there (a phone drawer, a split desktop window) flips it to the
+      // left, then clamps: the card is fixed-positioned, so an unclamped left
+      // simply leaves the viewport and takes its content with it.
+      const w = cardRef.current?.offsetWidth ?? 0
+      const right = r.right + 8
+      const left = right + w > window.innerWidth - 8 ? r.left - w - 8 : right
+      setPos({ left: Math.max(8, Math.min(left, window.innerWidth - w - 8)), top })
     }
     place()
     window.addEventListener('scroll', place, true)
@@ -119,16 +126,21 @@ export function HoverCard({
     }
   }, [open])
 
-  // The first placement ran before the card mounted (height read 0): once the
-  // card's real height is measurable, correct the bottom-edge clamp. The
-  // correction converges — a clamped top satisfies the guard, so it runs once.
+  // The first placement ran before the card mounted (both extents read 0):
+  // once the card's real box is measurable, correct the edge clamps. Each
+  // correction converges — a clamped value satisfies its own guard, so this
+  // runs once per opening.
   useLayoutEffect(() => {
     if (!open || pos === null) return
     /* v8 ignore next -- the card is mounted whenever pos is set, so the ref is attached here. */
-    const h = cardRef.current?.offsetHeight ?? 0
-    if (pos.top + h > window.innerHeight - 8) {
-      setPos({ left: pos.left, top: window.innerHeight - h - 8 })
-    }
+    const card = cardRef.current
+    const h = card?.offsetHeight ?? 0
+    const w = card?.offsetWidth ?? 0
+    const top = pos.top + h > window.innerHeight - 8 ? window.innerHeight - h - 8 : pos.top
+    const left = pos.left + w > window.innerWidth - 8
+      ? Math.max(8, window.innerWidth - w - 8)
+      : pos.left
+    if (top !== pos.top || left !== pos.left) setPos({ left, top })
   }, [open, pos])
 
   const copy = async (text: string): Promise<void> => {

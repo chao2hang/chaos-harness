@@ -354,3 +354,40 @@
     transition: none;
   }
 }
+
+/* A pointer that cannot hover reaches no hover-revealed control, so the row
+   verbs (rename / fork / archive, and the workspace verbs) were unreachable.
+   Touch gets the hover presentation permanently: actions in, relative time
+   out — the same row composition, which is known to fit. */
+@media (hover: none) {
+  .projectRow .rowActions,
+  .sessionRow .rowActions {
+    display: inline-flex;
+  }
+
+  .sessionRow .time {
+    display: none;
+  }
+}
+
+/* Touch tree (phone drawer breakpoint): the 32/34px mouse rows are the primary
+   navigation on a phone and sit below every touch-target minimum. */
+@media (max-width: 640px) {
+  .projectRow {
+    height: 44px;
+  }
+
+  .sessionRow {
+    height: 44px;
+  }
+
+  .projectRow .rowActions,
+  .sessionRow .rowActions {
+    height: 32px;
+  }
+
+  .iconButton {
+    width: 32px;
+    height: 32px;
+  }
+}

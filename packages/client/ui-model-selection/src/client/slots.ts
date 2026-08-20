@@ -21,5 +21,10 @@ export interface ModelSelectInjected {
    * @param selection - model selection and optional adapter-owned effort.
    * @returns whether the host accepted the selection.
    */
-  select: (selection: ModelSelection) => Promise<boolean>
+  select: (selection: ModelSelection & {
+    contextWindow?: number
+    maxTokens?: number
+    imageInput?: boolean
+    enableReasoning?: true
+  }) => Promise<boolean>
 }

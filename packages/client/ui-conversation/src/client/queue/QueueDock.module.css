@@ -107,6 +107,12 @@
   list-style: none;
 }
 
+@media (max-width: 640px) {
+  .list {
+    max-height: min(120px, 22dvh);
+  }
+}
+
 .row {
   box-sizing: border-box;
   display: flex;
